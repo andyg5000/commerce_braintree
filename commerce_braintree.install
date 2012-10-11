@@ -1,6 +1,27 @@
 <?php
 
 /**
+ * Implements hook_enable().
+ */
+function commerce_braintree_enable() {
+
+  $weight = db_select('system', 's')
+              ->fields('s', array('weight'))
+              ->condition('name', 'commerce_cardonfile', '=')
+              ->execute()
+              ->fetchField();
+
+  db_update('system')
+    ->fields(array(
+      'weight' => $weight + 1,
+    ))
+    ->condition('type', 'module')
+    ->condition('name', 'commerce_braintree')
+    ->execute();
+
+}
+
+/**
  * Implements hook_requirements().
  *
  * Checks required BrainTree Libraries on Install
