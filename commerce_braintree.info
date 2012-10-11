@@ -1,0 +1,5 @@
+name = Commerce Braintree Payment method
+description = Add the Braintree payment method
+package = Commerce
+core = 7.x
+dependencies[] = commerce_payment

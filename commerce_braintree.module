@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_braintree_commerce_payment_method_info(){
+  $payment_methods['braintree'] = array(
+    'base' => 'commerce_braintree',
+    'file' => 'commerce_braintree.callbacks.inc',
+    'title' => t('Braintree'),
+    'short_title' => t('Braintree'),
+    'description' => t('Braintree (todo)'),
+    'terminal' => FALSE,
+    'offsite' => TRUE,
+    'offsite_autoredirect' => FALSE,
+  );
+  return $payment_methods;
+}
+
+
+/**
+ * Implements hook_menu().
+ */
+function commerce_braintree_menu() {
+  $items = array();
+  // Define an always accessible path to receive autoresponse.
+  $items['checkout/commerce_order/payment/return'] = array(
+    'page callback' => 'commerce_braintree_payment_autoresponse',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+
+function commerce_braintree_payment_autoresponse($order = NULL) {
+  $order = commerce_order_load($order);
+  dsm(__FUNCTION__);
+  commerce_payment_redirect_pane_next_page($order);
+  return;
+
+}
