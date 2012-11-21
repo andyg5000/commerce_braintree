@@ -427,7 +427,7 @@ function commerce_braintree_get_payment_transaction($feedback_remote_id) {
  * @param $hook
  */
 function commerce_braintree_module_implements_alter(&$implementations, $hook) {
-  if ($hook == 'form_alter') {
+  if ($hook == 'form_alter' && isset($implementations['commerce_cardonfile'])) {
     $group = $implementations['commerce_cardonfile'];
     unset($implementations['commerce_cardonfile']);
   }
