@@ -26,7 +26,8 @@ function commerce_braintree_commerce_payment_method_info() {
     'file' => 'commerce_braintree.commerce_braintree.inc',
     'title' => t('Braintree'),
     'short_title' => t('Braintree'),
-    'description' => t('Braintree (todo)'),
+    'display_title' => t('Credit Card'),
+    'description' => t('Provide integration with Braintree.'),
     'terminal' => FALSE,
     'offsite' => TRUE,
     'offsite_autoredirect' => FALSE,
@@ -37,8 +38,8 @@ function commerce_braintree_commerce_payment_method_info() {
     'file' => 'commerce_braintree.commerce_braintree_cof.inc',
     'title' => t('Braintree - Card On File'),
     'short_title' => t('Braintree Cardonfile'),
-    'display_title' => t('Braintree (COF)'),
-    'description' => t('Braintree - Can be used for regular transaction with option to keep the credit card saved for re-use - requires the Card on File module '),
+    'display_title' => t('Credit Card'),
+    'description' => t('Provide integration with Braintree (integrated with Commerce Cardonfile.'),
     'terminal' => FALSE,
     'offsite' => TRUE,
     'offsite_autoredirect' => FALSE,
@@ -372,15 +373,15 @@ function commerce_braintree_credit_card_form($payment_method) {
     '#name' => 'transaction[credit_card][expiration_year]',
   );
 
-   $form['commerce_payment']['payment_details']['credit_card']['code'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Security code'),
-    '#default_value' => '',
-    '#attributes' => array('autocomplete' => 'off'),
-    '#required' => TRUE,
-    '#maxlength' => 4,
-    '#size' => 4,
-    '#name' => 'transaction[credit_card][cvv]',
+  $form['commerce_payment']['payment_details']['credit_card']['code'] = array(
+   '#type' => 'textfield',
+   '#title' => t('Security code'),
+   '#default_value' => '',
+   '#attributes' => array('autocomplete' => 'off'),
+   '#required' => TRUE,
+   '#maxlength' => 4,
+   '#size' => 4,
+   '#name' => 'transaction[credit_card][cvv]',
   );
 
   return $form;
@@ -434,6 +435,9 @@ function commerce_braintree_module_implements_alter(&$implementations, $hook) {
 }
 
 
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
 function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &$form_state) {
   global $user;
 
@@ -455,6 +459,10 @@ function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &
 
 }
 
+/**
+ * Helper function. Provide the cancel and return url used when calling
+ * the payment provider.
+ */
 function _commerce_braintree_set_feedback_url($order, $payment_method) {
 // Set feedback URLs
   $settings = array(
