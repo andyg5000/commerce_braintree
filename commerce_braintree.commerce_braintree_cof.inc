@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * @file
+ * Include payment method settings callback, redirect form callbacks...
+ */
+
+/**
  * Payment method callback: settings form.
  */
 function commerce_braintree_cof_settings_form($settings = NULL) {
