@@ -549,20 +549,22 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
 
   // Prepare the data to be recorded in Commerce.
   $commerce_transaction->instance_id = $payment_method['instance_id'];
-  $commerce_transaction->remote_id = $transaction->id;
-  $commerce_transaction->status = $transaction->status;
-  $commerce_transaction->remote_status = $transaction->status;
-  // Commerce don't store amount in decimal, convert it.
-  $commerce_transaction->amount = commerce_currency_decimal_to_amount($transaction->amount, $transaction->currencyIsoCode);
   $commerce_transaction->message = $message;
 
-  commerce_payment_transaction_save($commerce_transaction);
   if ($redirect) {
     if (!$result->success) {
+      $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+      commerce_payment_transaction_save($commerce_transaction);
       // There was an error, go back to the previous pane.
       commerce_payment_redirect_pane_previous_page($order);
     }
     else {
+      $commerce_transaction->remote_id = $transaction->id;
+      $commerce_transaction->remote_status = $transaction->status;
+      // Commerce don't store amount in decimal, convert it.
+      $commerce_transaction->amount = commerce_currency_decimal_to_amount($transaction->amount, $transaction->currencyIsoCode);
+      $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      commerce_payment_transaction_save($commerce_transaction);
       // Transaction succeded. Go to next pane.
       commerce_payment_redirect_pane_next_page($order);
     }
