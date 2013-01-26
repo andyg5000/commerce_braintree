@@ -28,38 +28,45 @@ function commerce_braintree_enable() {
  */
 function commerce_braintree_requirements($phase) {
   $requirements = array();
-  // Ensure translations don't break at install time
+  // Ensure translations don't break at install time.
   $t = get_t();
 
-  // Test PHP version
+  // Test PHP version.
   if (version_compare(phpversion(), '5.2.1', '<')) {
     $requirements['php']['description'] = $t('Your PHP installation is too old. Braintree requires at least PHP %version.', array('%version' => '5.2.1'));
     $requirements['php']['severity'] = REQUIREMENT_ERROR;
   }
 
-  //Test Required PHP Extensions
-  $requiredExtensions = array('xmlwriter', 'SimpleXML', 'openssl', 'dom', 'hash', 'curl');
+  // Test Required PHP Extensions.
+  $requiredExtensions = array(
+    'xmlwriter',
+    'SimpleXML',
+    'openssl',
+    'dom',
+    'hash',
+    'curl'
+  );
   $disabled_extensions = array();
 
   $value = '';
-  foreach($requiredExtensions as $ext){
+  foreach ($requiredExtensions as $ext) {
     $ext_enabled = extension_loaded($ext) ? 'Enabled' : 'Disabled';
 
-    $value .= $ext.': '.$ext_enabled.' ';
+    $value .= $ext . ': ' . $ext_enabled . ' ';
 
-    if ($ext_enabled == 'Disabled'){
+    if ($ext_enabled == 'Disabled') {
       $disabled_extensions[] = $ext;
     }
   }
 
   $requirements['php_extensions'] = array(
       'title' => $t('Braintree PHP Extensions'),
-      'value' => ($phase=='install') ? '' : $value
+      'value' => ($phase == 'install') ? '' : $value
   );
 
-  if ($disabled_extensions){
-      $requirements['php_extensions']['severity'] = REQUIREMENT_ERROR;
-      $requirements['php_extensions']['description'] = $t('The following PHP extensions must be enabled for Braintree: '.implode(', ',$disabled_extensions));
+  if ($disabled_extensions) {
+    $requirements['php_extensions']['severity'] = REQUIREMENT_ERROR;
+    $requirements['php_extensions']['description'] = $t('The following PHP extensions must be enabled for Braintree: ' . implode(', ', $disabled_extensions));
   }
 
   return $requirements;

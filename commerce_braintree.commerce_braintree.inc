@@ -14,8 +14,10 @@ function commerce_braintree_settings_form($settings = NULL) {
 }
 
 /**
- * Payment method callback: redirect form, we're building the request that is
- * going to be sent to atos after the necessary checks.
+ * Payment method callback: redirect form.
+ *
+ * Building the request that is going to be sent to braintree after the
+ * necessary checks.
  */
 function commerce_braintree_redirect_form($form, &$form_state, $order, $payment_method) {
   $settings = _commerce_braintree_set_feedback_url($order, $payment_method);
@@ -40,7 +42,7 @@ function commerce_braintree_redirect_form($form, &$form_state, $order, $payment_
         'customer' => array(
           'firstName' => $customer_name,
           'email' => $customer_mail,
-          ),
+        ),
         'billing' => array(
           'countryCodeAlpha2' => $country,
           'streetAddress' => $thoroughfare,
@@ -72,23 +74,23 @@ function commerce_braintree_redirect_form($form, &$form_state, $order, $payment_
  * Implements hook_redirect_form_validate().
  */
 function commerce_braintree_redirect_form_validate($order, $payment_method) {
-   if ($feedback = commerce_braintree_get_feedback()) {
-    // Process the transaction based on the parameters received
+  if ($feedback = commerce_braintree_get_feedback()) {
+    // Process the transaction based on the parameters received.
     commerce_braintree_process_transaction($order, $payment_method, $feedback);
     return TRUE;
-   }
+  }
 }
 
 /**
- * Process the payment transaction with the info received
+ * Process the payment transaction with the info received.
  *
- * @param $order
+ * @param object $order
  *   The loaded order that is being processed
- * @param $payment_method
+ * @param array $payment_method
  *   The payment method settings
- * @param $feedback
+ * @param string $feedback
  *   The parameters received from Braintree regarding the payment
- * @param $redirect
+ * @param bool $redirect
  *   Specifies whether to call redirect functions or not
  */
 function commerce_braintree_process_transaction($order, $payment_method, $feedback, $redirect = TRUE) {

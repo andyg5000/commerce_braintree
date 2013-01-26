@@ -19,6 +19,11 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
 
   protected $randomName;
 
+  /**
+   * Set a random name.
+   *
+   * @param string $randomName
+   */
   public function setRandomName($randomName) {
     $this->randomName = $randomName;
   }
@@ -52,7 +57,7 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
     $this->web_user = $this->drupalCreateUser(array('manage own card data'));
 
     // The rule that sends a mail after checkout completion should be disabled
-    //  as it returns an error caused by how mail messages are stored.
+    // as it returns an error caused by how mail messages are stored.
     $rules_config = rules_config_load('commerce_checkout_order_email');
     $rules_config->active = FALSE;
     $rules_config->save();
@@ -61,6 +66,9 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
     $this->setRandomName($this->randomName());
   }
 
+  /**
+   * Init Braintree test credentials.
+   */
   protected function getCredentials() {
     // Include Braintree API.
     // Using a test account.
@@ -84,11 +92,11 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
           'type' => Braintree_Transaction::SALE,
           'amount' => $this->price,
           'customer' => array(
-              'firstName' => 'Test User',
+            'firstName' => 'Test User',
             'email' => 'test@exemple.com',
           ),
           'billing' => array(
-             'countryCodeAlpha2' => 'US',
+            'countryCodeAlpha2' => 'US',
           ),
           'options' => array(
             'storeInVault' => TRUE,
@@ -194,7 +202,13 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
   private function setBraintreeCredential() {
 
     // Create an admin user, log in and enable test blocks.
-    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'bypass rules access', 'bypass node access', 'administer nodes', 'administer payment methods'));
+    $this->admin_user = $this->drupalCreateUser(array(
+      'administer site configuration',
+      'bypass rules access',
+      'bypass node access',
+      'administer nodes',
+      'administer payment methods'
+    ));
     $this->drupalLogin($this->admin_user);
 
     $this->drupalGet('admin/commerce/config/payment-methods/manage/commerce_payment_braintree_cof');
@@ -206,6 +220,5 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
       'parameter[payment_method][settings][payment_method][settings][commerce_braintree_private_key]' => '90907493a55d78ffdccaf415a3226f25',
     );
     $this->drupalPost(NULL, $info, t('Save'));
-
   }
 }

@@ -58,8 +58,8 @@ function commerce_braintree_commerce_payment_method_info() {
 }
 
 /**
-* Menu callback. Get the query from Braintree when updating a credit card.
-*/
+ * Menu callback. Get the query from Braintree when updating a credit card.
+ */
 function commerce_braintree_update_card() {
   global $user;
   $feedback = commerce_braintree_get_feedback();
@@ -154,23 +154,17 @@ function commerce_braintree_default_settings_form($settings = NULL) {
 
 /**
  * Implements hook_commerce_checkout_page_info_alter().
- *
- * @param $checkout_pages
  */
 function commerce_braintree_commerce_checkout_page_info_alter(&$checkout_pages) {
   // Find a better way to remove/rewrite the help.
- // unset($checkout_pages['payment']['help']);
+  // unset($checkout_pages['payment']['help']);
 }
 
 /**
  * Implements hook_form_alter().
- *
- * @param $form
- * @param $form_state
- * @param $form_id
  */
 function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
-   // If the current form ID is for a checkout form...
+  // If the current form ID is for a checkout form...
   if (strpos($form_id, 'commerce_checkout_form_') === 0 && $form_id != 'commerce_checkout_form_payment') {
     // And it specifies a valid checkout page...
     if (commerce_checkout_page_load(substr($form_id, 23))) {
@@ -223,8 +217,6 @@ function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
 
 /**
  * Implements hook_commerce_checkout_pane_info_alter().
- *
- * @param $checkout_panes
  */
 function commerce_braintree_commerce_checkout_pane_info_alter(&$checkout_panes) {
   // Add custom validation to be able to save the values in session.
@@ -251,14 +243,13 @@ function _commerce_braintree_commerce_payment_checkout_custom_validation($form, 
 
 
 /**
- * Saves the "card on file" choice (reuse a card, which card or new card) in a
- * session variable.
+ * Saves the "card on file" choice (reuse a card, which card or new card).
  *
  * @param $order_id
  * @param $choice
  */
 function commerce_braintree_payment_session_save($order_id, $choice) {
-  $_SESSION['order_'.$order_id] = $choice;
+  $_SESSION['order_' . $order_id] = $choice;
 }
 
 /**
@@ -273,17 +264,15 @@ function commerce_braintree_payment_session_load($order_id) {
 }
 
 /**
- * Delete the "card on file" choice (reuse a card, which card or new card) in a
- * session variable.
+ * Delete the "card on file" choice.
  */
 function commerce_braintree_payement_session_delete($order_id = NULL) {
   if ($order_id) {
-    unset($_SESSION['order_'.$order_id]);
+    unset($_SESSION['order_' . $order_id]);
   }
 }
 /**
- * Include necessary API files from braintree and init the credentials
- * needed to access this API.
+ * Include necessary API files from braintree and init the credentials.
  *
  * @param array $payment_method
  *   The payement method array provided by Commerce. Credentials will be taken
@@ -308,8 +297,7 @@ function _commerce_braintree_init_credentials($payment_method = array()) {
 
 
 /**
- * Helper function. Buidl the credit card form with the correct name that
- * Braintree needs.
+ * Helper function. Build the credit card form.
  */
 function commerce_braintree_credit_card_form($payment_method) {
   // Merge default values into the default array.
@@ -380,21 +368,20 @@ function commerce_braintree_credit_card_form($payment_method) {
   );
 
   $form['commerce_payment']['payment_details']['credit_card']['code'] = array(
-   '#type' => 'textfield',
-   '#title' => t('Security code'),
-   '#default_value' => '',
-   '#attributes' => array('autocomplete' => 'off'),
-   '#required' => TRUE,
-   '#maxlength' => 4,
-   '#size' => 4,
-   '#name' => 'transaction[credit_card][cvv]',
+    '#type' => 'textfield',
+    '#title' => t('Security code'),
+    '#default_value' => '',
+    '#attributes' => array('autocomplete' => 'off'),
+    '#required' => TRUE,
+    '#maxlength' => 4,
+    '#size' => 4,
+    '#name' => 'transaction[credit_card][cvv]',
   );
 
   return $form;
 }
 
 /**
- * Helper function.
  * Return the query string that contains Braintree response, after a request.
  */
 function commerce_braintree_get_feedback() {
@@ -466,15 +453,14 @@ function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &
 }
 
 /**
- * Helper function. Provide the cancel and return url used when calling
- * the payment provider.
+ * Provide the cancel and return url used when calling the payment provider.
  */
 function _commerce_braintree_set_feedback_url($order, $payment_method) {
-// Set feedback URLs
+  // Set feedback URLs.
   $settings = array(
-    // Return to the previous page when payment is canceled
+    // Return to the previous page when payment is canceled.
     'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-    // Return to the payment redirect page for processing successful payments
+    // Return to the payment redirect page for processing successful payments.
     'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
     // Specify the current payment method instance ID in the notify_url
     'payment_method' => $payment_method['instance_id'],
@@ -491,11 +477,11 @@ function _commerce_braintree_set_feedback_url($order, $payment_method) {
 function _commerce_braintree_get_transaction_informations($order) {
   $wrapper = entity_metadata_wrapper('commerce_order', $order);
 
-  // Get financial info
+  // Get financial info.
   $currency_code = $wrapper->commerce_order_total->currency_code->value();
   $amount = $wrapper->commerce_order_total->amount->value();
 
-  // Customer data
+  // Customer data.
   $customer_name = $wrapper->commerce_customer_billing->commerce_customer_address->name_line->value();
   $country = $wrapper->commerce_customer_billing->commerce_customer_address->country->value();
   $thoroughfare = $wrapper->commerce_customer_billing->commerce_customer_address->thoroughfare->value();
@@ -521,7 +507,7 @@ function _commerce_braintree_get_transaction_informations($order) {
  *
  * @param $result
  * @param $order
- * @param $payment_method
+ * @param array $payment_method
  * @param $redirect
  */
 function _commerce_braintree_default_process_transaction($result, $order, $payment_method, $redirect) {
