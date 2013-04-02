@@ -59,14 +59,14 @@ function commerce_braintree_requirements($phase) {
     }
   }
 
-  $requirements['php_extensions'] = array(
+  $requirements['commerce_braintree_php_extensions'] = array(
       'title' => $t('Braintree PHP Extensions'),
       'value' => ($phase == 'install') ? '' : $value
   );
 
   if ($disabled_extensions) {
-    $requirements['php_extensions']['severity'] = REQUIREMENT_ERROR;
-    $requirements['php_extensions']['description'] = $t('The following PHP extensions must be enabled for Braintree: ' . implode(', ', $disabled_extensions));
+    $requirements['commerce_braintree_php_extensions']['severity'] = REQUIREMENT_ERROR;
+    $requirements['commerce_braintree_php_extensions']['description'] = $t('The following PHP extensions must be enabled for Braintree: ' . implode(', ', $disabled_extensions));
   }
 
   return $requirements;
