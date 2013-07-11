@@ -64,7 +64,7 @@ function commerce_braintree_update_card() {
   global $user;
   $feedback = commerce_braintree_get_feedback();
   if ($feedback) {
-    $payment_method  = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
+    $payment_method = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
     _commerce_braintree_init_credentials($payment_method);
     $result = Braintree_TransparentRedirect::confirm($feedback);
     $token = $result->creditCard->_attributes['token'];
@@ -241,7 +241,6 @@ function _commerce_braintree_commerce_payment_checkout_custom_validation($form, 
   return TRUE;
 }
 
-
 /**
  * Saves the "card on file" choice (reuse a card, which card or new card).
  *
@@ -260,7 +259,7 @@ function commerce_braintree_payment_session_save($order_id, $choice) {
  * @param $choice
  */
 function commerce_braintree_payment_session_load($order_id) {
-  return isset($_SESSION['order_'.$order_id]) ? $_SESSION['order_'.$order_id] : NULL;
+  return isset($_SESSION['order_' . $order_id]) ? $_SESSION['order_' . $order_id] : NULL;
 }
 
 /**
@@ -271,6 +270,7 @@ function commerce_braintree_payement_session_delete($order_id = NULL) {
     unset($_SESSION['order_' . $order_id]);
   }
 }
+
 /**
  * Include necessary API files from braintree and init the credentials.
  *
@@ -294,7 +294,6 @@ function _commerce_braintree_init_credentials($payment_method = array()) {
     Braintree_Configuration::privateKey($credentials['commerce_braintree_private_key']);
   }
 }
-
 
 /**
  * Helper function. Build the credit card form.
@@ -427,29 +426,27 @@ function commerce_braintree_module_implements_alter(&$implementations, $hook) {
   }
 }
 
-
 /**
  * Implements hook_form_FORM_ID_alter().
  */
 function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &$form_state) {
   global $user;
 
-  $payment_method  = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
+  $payment_method = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
   _commerce_braintree_init_credentials($payment_method);
   $form['credit_card']['owner']['#name'] = 'credit_card[cardholder_name]';
   $form['credit_card']['number']['#name'] = 'credit_card[number]';
   $form['credit_card']['exp_month']['#name'] = 'transaction[credit_card][expiration_month]';
   $form['credit_card']['exp_year']['#name'] = 'transaction[credit_card][expiration_year]';
   $trData = Braintree_TransparentRedirect::updateCreditCardData(array(
-    'redirectUrl' => url('user/commerce_braintree/update_card', array('absolute' => TRUE)),
-    'paymentMethodToken' => $form['card_data']['#value']['remote_id'],
+      'redirectUrl' => url('user/commerce_braintree/update_card', array('absolute' => TRUE)),
+      'paymentMethodToken' => $form['card_data']['#value']['remote_id'],
   ));
   $form['tr_data']['#type'] = 'hidden';
   $form['tr_data']['#name'] = 'tr_data';
   $form['tr_data']['#default_value'] = $trData;
 
   $form['#action'] = Braintree_TransparentRedirect::url();
-
 }
 
 /**
@@ -530,7 +527,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
   }
   else {
     $message = $result->message;
-    drupal_set_message('There was an error. ' . $result->message, 'error');
+    drupal_set_message('There was an error. ' . check_plain($result->message), 'error');
   }
 
   // Prepare the data to be recorded in Commerce.
