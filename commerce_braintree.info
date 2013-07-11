@@ -4,7 +4,7 @@ package = Commerce
 core = 7.x
 configure = admin/commerce/config/payment-methods
 dependencies[] = commerce_payment
-dependencies[] = commerce_cardonfile (1.x)
+dependencies[] = commerce_cardonfile (2.x)
 
 ; Tests
 files[] = tests/commerce_braintree.test
