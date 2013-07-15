@@ -527,7 +527,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
   }
   else {
     $message = $result->message;
-    drupal_set_message('There was an error. ' . check_plain($result->message), 'error');
+    drupal_set_message(t('There was an error: %error.', array('%error' => $result->message)), 'error');
   }
 
   // Prepare the data to be recorded in Commerce.
