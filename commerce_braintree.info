@@ -1,6 +1,6 @@
 name = Commerce Braintree Payment method
 description = Add the Braintree payment method
-package = Commerce
+package = Commerce (contrib)
 core = 7.x
 configure = admin/commerce/config/payment-methods
 dependencies[] = commerce_payment
