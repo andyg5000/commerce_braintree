@@ -163,11 +163,15 @@ function commerce_braintree_default_settings_form($settings = NULL) {
 }
 
 /**
- * Implements hook_commerce_checkout_page_info_alter().
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Alter the Payment checkout page to remove the default help text.
  */
-function commerce_braintree_commerce_checkout_page_info_alter(&$checkout_pages) {
-  // Find a better way to remove/rewrite the help.
-  // unset($checkout_pages['payment']['help']);
+function commerce_braintree_form_commerce_checkout_form_payment_alter(&$form, &$form_state) {
+  if (!empty($form['commerce_payment']['payment_method']['#default_value']) &&
+    strpos($form['commerce_payment']['payment_method']['#default_value'], 'braintree_cof') === 0) {
+    unset($form['help']);
+  }
 }
 
 /**

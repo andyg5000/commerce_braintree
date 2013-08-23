@@ -99,6 +99,7 @@ function commerce_braintree_cof_redirect_form($form, &$form_state, $order, $paym
   // Change the action. The form will be submitted directly to braintree's
   // servers.
   $form['#action'] = Braintree_TransparentRedirect::url();
+
   return $form;
 }
 
