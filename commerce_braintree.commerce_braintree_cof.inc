@@ -36,32 +36,30 @@ function commerce_braintree_cof_redirect_form($form, &$form_state, $order, $paym
   $amount = commerce_currency_amount_to_decimal($balance['amount'], commerce_default_currency());
   if ($context === NULL || $context == 'new') {
     $form = commerce_braintree_credit_card_form($payment_method);
-    $trData = Braintree_TransparentRedirect::transactionData(
-      array(
-        // Add transaction related data.
-        'transaction' => array(
-          'type' => Braintree_Transaction::SALE,
-          'amount' => $amount,
-          'customer' => array(
-            'firstName' => $customer_name,
-            'email' => $customer_mail,
-          ),
-          'billing' => array(
-            'countryCodeAlpha2' => $country,
-            'streetAddress' => $thoroughfare,
-            'firstName' => $customer_name,
-            'locality' => $locality,
-            'postalCode' => $postal_code,
-            'region' => $administrative_area,
-          ),
-          'options' => array(
-            'storeInVault' => TRUE,
-            'submitForSettlement' => TRUE,
-          ),
+    $trData = Braintree_TransparentRedirect::transactionData(array(
+      // Add transaction related data.
+      'transaction' => array(
+        'type' => Braintree_Transaction::SALE,
+        'amount' => $amount,
+        'customer' => array(
+          'firstName' => $customer_name,
+          'email' => $customer_mail,
         ),
-        'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE))
-      )
-    );
+        'billing' => array(
+          'countryCodeAlpha2' => $country,
+          'streetAddress' => $thoroughfare,
+          'firstName' => $customer_name,
+          'locality' => $locality,
+          'postalCode' => $postal_code,
+          'region' => $administrative_area,
+        ),
+        'options' => array(
+          'storeInVault' => TRUE,
+          'submitForSettlement' => TRUE,
+        ),
+      ),
+      'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    ));
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('submit'),
@@ -70,24 +68,25 @@ function commerce_braintree_cof_redirect_form($form, &$form_state, $order, $paym
   }
   else {
     global $user;
-    $stored_cards = commerce_cardonfile_data_load_multiple($user->uid, $payment_method['instance_id']);
+    $stored_cards = commerce_cardonfile_load_multiple_by_uid($user->uid, $payment_method['instance_id']);
     $element = variable_get('commerce_cardonfile_selector', 'radios');
-    $options = commerce_cardonfile_options_list($stored_cards, $element);
+    $options = commerce_cardonfile_element_options_list($stored_cards, $element);
     $card = commerce_braintree_load_cardonfile_data($user->uid, commerce_braintree_payment_session_load($order->order_id));
     $settings = _commerce_braintree_set_feedback_url($order, $payment_method);
 
     $trData = Braintree_TransparentRedirect::transactionData(
-      array(
-        // Add transaction related data.
-        'transaction' => array(
-          'type' => Braintree_Transaction::SALE,
-          'amount' => $amount,
-          'paymentMethodToken' => $card['remote_id'],
-        ),
-        'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE))
-      )
+        array(
+          // Add transaction related data.
+          'transaction' => array(
+            'type' => Braintree_Transaction::SALE,
+            'amount' => $amount,
+            'paymentMethodToken' => $card['remote_id'],
+          ),
+          'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE))
+        )
     );
-    $form['card']['#markup'] = theme('card_data_overview', array('card_data' => commerce_cardonfile_data_load($card)));
+
+    $form['card']['#markup'] = theme('card_data_overview', array('card_data' => commerce_cardonfile_load($card['card_id'])));
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Proceed to payment'),
@@ -127,40 +126,40 @@ function commerce_braintree_cof_redirect_form_validate($order, $payment_method) 
  *   Specifies whether to call redirect functions or not
  */
 function commerce_braintree_cof_process_transaction($order, $payment_method, $feedback, $redirect = TRUE) {
-
   _commerce_braintree_init_credentials($payment_method);
   $result = Braintree_TransparentRedirect::confirm($feedback);
   $context = commerce_braintree_payment_session_load($order->order_id);
   if (($context === NULL || $context == 'new') && $result->success) {
     // Card on file parameters.
     $new_card_data = array();
+    $new_card_data = commerce_cardonfile_new();
     // uid: the user ID of the account the card data is being stored for.
-    $new_card_data['uid'] = $order->uid;
+    $new_card_data->uid = $order->uid;
     // payment_method: the name of the payment method the card was used for.
-    $new_card_data['payment_method'] = $payment_method['method_id'];
+    $new_card_data->payment_method = $payment_method['method_id'];
     // instance_id: the payment method instance ID containing the credentials
     // that will be used to reuse the card on file.
-    $new_card_data['instance_id'] = $payment_method['instance_id'];
+    $new_card_data->instance_id = $payment_method['instance_id'];
     // remote_id: the remote ID to the full card data at the payment gateway.
-    $new_card_data['remote_id'] = $result->transaction->_attributes['creditCard']['token'];
+    $new_card_data->remote_id = $result->transaction->_attributes['creditCard']['token'];
     // card_type: short name of the credit card type if determined, based on the
     // keys returned by commerce_payment_credit_card_types().
-    $new_card_data['card_type'] = $result->transaction->_attributes['creditCard']['cardType'];
+    $new_card_data->card_type = $result->transaction->_attributes['creditCard']['cardType'];
     // card_name: the name of the cardholder.
-    $new_card_data['card_name'] = $result->transaction->_attributes['creditCard']['cardholderName'];
+    $new_card_data->card_name = $result->transaction->_attributes['creditCard']['cardholderName'];
     // card_number: the last 4 digits of the credit card number.
-    $new_card_data['card_number'] = $result->transaction->_attributes['creditCard']['last4'];
+    $new_card_data->card_number = $result->transaction->_attributes['creditCard']['last4'];
     // card_exp_month: the numeric representation of the expiration month.
-    $new_card_data['card_exp_month'] = $result->transaction->_attributes['creditCard']['expirationMonth'];
+    $new_card_data->card_exp_month = $result->transaction->_attributes['creditCard']['expirationMonth'];
     // card_exp_year: the four digit expiration year.
-    $new_card_data['card_exp_year'] = $result->transaction->_attributes['creditCard']['expirationYear'];
+    $new_card_data->card_exp_year = $result->transaction->_attributes['creditCard']['expirationYear'];
     // status: integer status of the card data: inactive (0), active (1), or
     // active and not deletable (2).
-    $new_card_data['status'] = 1;
+    $new_card_data->status = 1;
     // Save and log the creation of the new card on file.
-    $save = commerce_cardonfile_data_save($new_card_data);
+    $save = commerce_cardonfile_save($new_card_data);
     watchdog('commerce_braintree', 'COF, with remote ID @profile_id, added for user @uid.', array(
-      '@profile_id' => $new_card_data['remote_id'],
+      '@profile_id' => $new_card_data->remote_id,
       '@uid' => $order->uid
     ));
   }
@@ -181,10 +180,10 @@ function commerce_braintree_cof_process_transaction($order, $payment_method, $fe
  *   data does not exist.
  */
 function commerce_braintree_load_cardonfile_data($uid, $card_id) {
-  return db_select('commerce_card_data', 'ccd')
-    ->fields('ccd')
-    ->condition('ccd.uid', $uid)
-    ->condition('ccd.card_id', $card_id)
-    ->execute()
-    ->fetchAssoc();
+  return db_select('commerce_cardonfile', 'ccd')
+      ->fields('ccd')
+      ->condition('ccd.uid', $uid)
+      ->condition('ccd.card_id', $card_id)
+      ->execute()
+      ->fetchAssoc();
 }

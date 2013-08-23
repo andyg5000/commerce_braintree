@@ -4,12 +4,11 @@
  * Implements hook_enable().
  */
 function commerce_braintree_enable() {
-
   $weight = db_select('system', 's')
-              ->fields('s', array('weight'))
-              ->condition('name', 'commerce_cardonfile', '=')
-              ->execute()
-              ->fetchField();
+    ->fields('s', array('weight'))
+    ->condition('name', 'commerce_cardonfile', '=')
+    ->execute()
+    ->fetchField();
 
   db_update('system')
     ->fields(array(
@@ -18,7 +17,6 @@ function commerce_braintree_enable() {
     ->condition('type', 'module')
     ->condition('name', 'commerce_braintree')
     ->execute();
-
 }
 
 /**

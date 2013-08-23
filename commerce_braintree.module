@@ -10,6 +10,7 @@
  * Implements hook_menu().
  */
 function commerce_braintree_menu() {
+  $items = array();
 
   // Define an always accessible path to receive IPNs.
   $items['user/commerce_braintree/update_card'] = array(
@@ -73,19 +74,18 @@ function commerce_braintree_update_card() {
     $expirationYear = $result->creditCard->_attributes['expirationYear'];
     $last4 = $result->creditCard->_attributes['last4'];
 
-    $card_stored = db_select('commerce_card_data', 'ccd')
-      ->fields('ccd')
-      ->condition('ccd.remote_id', $token)
-      ->execute()
-      ->fetchAssoc();
-    $card_stored['card_name'] = $cardholderName;
-    $card_stored['card_exp_month'] = $expirationMonth;
-    $card_stored['card_exp_year'] = $expirationYear;
-    $card_stored['card_number'] = $last4;
+    $cards = commerce_cardonfile_load_multiple_by_remote_id($token);
+    $card_stored = reset($cards);
+    $card_stored->card_name = $cardholderName;
+    $card_stored->card_exp_month = $expirationMonth;
+    $card_stored->card_exp_year = $expirationYear;
+    $card_stored->card_number = $last4;
 
-    commerce_cardonfile_data_save($card_stored);
+    commerce_cardonfile_save($card_stored);
+
+    drupal_set_message(t('Thank you for updating your credit card information.'));
   }
-  drupal_goto('user/' . $user->uid . '/stored-payment-methods');
+  drupal_goto('user/' . $user->uid . '/cards');
 }
 
 /**
@@ -94,12 +94,22 @@ function commerce_braintree_update_card() {
 function commerce_braintree_cardonfile_update_delete($form, &$form_state, $payment_method, $card_data) {
   if ($form['#id'] == 'commerce-cardonfile-delete-form') {
     _commerce_braintree_init_credentials($payment_method);
-    $result = Braintree_CreditCard::delete($card_data['remote_id']);
-    if ($result->success) {
-      db_delete('commerce_card_data')
-        ->condition('card_id', $card_data['card_id'])
-        ->execute();
+
+    try {
+      $result = Braintree_CreditCard::delete($card_data->remote_id);
     }
+    catch (Braintree_Exception_NotFound $e) {
+      // If the card is not found in the Braintree vault, delete the local
+      // record with no error message. The card data no longer exists or has
+      // changed its token in Braintree, so there's no use keeping it locally.
+      commerce_cardonfile_delete($card_data->card_id);
+    }
+
+    // If the delete request was successful delete the local data.
+    if (!empty($result) && $result instanceof Braintree_Result_Successful) {
+      commerce_cardonfile_delete($card_data->card_id);
+    }
+
     return TRUE;
   }
 }
@@ -108,8 +118,8 @@ function commerce_braintree_cardonfile_update_delete($form, &$form_state, $payme
  * Returns the default settings for the Braintree payment method.
  */
 function commerce_braintree_default_settings_form($settings = NULL) {
-
   $default_currency = commerce_default_currency();
+
   // Merge default settings into the stored settings array.
   // Demonstration or production ?
   $form['commerce_braintree_mode'] = array(
@@ -177,20 +187,19 @@ function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
 
           // Load any existing card data for the current payment method instance
           // and user.
-          $stored_cards = commerce_cardonfile_data_load_multiple($form_state['account']->uid, $payment_method['instance_id']);
-
-          // Filter out expired cards.
-          foreach ($stored_cards as $card_id => $card_data) {
-            if ($card_data['card_exp_year'] < date('Y') ||
-              $card_data['card_exp_year'] == date('Y') && $card_data['card_exp_month'] < date('m')) {
-              unset($stored_cards[$card_id]);
-            }
-          }
-
-          // If we found any stored cards, show the options in the form.
+          $stored_cards = commerce_cardonfile_load_multiple_by_uid($form_state['account']->uid, $payment_method['instance_id']);
           if (!empty($stored_cards)) {
+            // Filter out expired cards.
+            foreach ($stored_cards as $card_id => $card_data) {
+              if ($card_data->card_exp_year < date('Y') ||
+                $card_data->card_exp_year == date('Y') && $card_data->card_exp_month < date('m')) {
+                unset($stored_cards[$card_id]);
+              }
+            }
+
+            // If we found any stored cards, show the options in the form.
             $element = variable_get('commerce_cardonfile_selector', 'radios');
-            $options = commerce_cardonfile_options_list($stored_cards, $element);
+            $options = commerce_cardonfile_element_options_list($stored_cards, $element);
 
             $form['commerce_payment']['payment_details']['cardonfile'] = array(
               '#type' => $element,
@@ -430,22 +439,28 @@ function commerce_braintree_module_implements_alter(&$implementations, $hook) {
  * Implements hook_form_FORM_ID_alter().
  */
 function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &$form_state) {
-  global $user;
-
+  // @todo Do not hard code a requirement on a specific payment method instance.
   $payment_method = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
   _commerce_braintree_init_credentials($payment_method);
+
+  // Adjust the names of form elements to match the requirements of Braintree's
+  // Transparent Redirect API.
   $form['credit_card']['owner']['#name'] = 'credit_card[cardholder_name]';
   $form['credit_card']['number']['#name'] = 'credit_card[number]';
-  $form['credit_card']['exp_month']['#name'] = 'transaction[credit_card][expiration_month]';
-  $form['credit_card']['exp_year']['#name'] = 'transaction[credit_card][expiration_year]';
-  $trData = Braintree_TransparentRedirect::updateCreditCardData(array(
-      'redirectUrl' => url('user/commerce_braintree/update_card', array('absolute' => TRUE)),
-      'paymentMethodToken' => $form['card_data']['#value']['remote_id'],
-  ));
-  $form['tr_data']['#type'] = 'hidden';
-  $form['tr_data']['#name'] = 'tr_data';
-  $form['tr_data']['#default_value'] = $trData;
+  $form['credit_card']['exp_month']['#name'] = 'credit_card[expiration_month]';
+  $form['credit_card']['exp_year']['#name'] = 'credit_card[expiration_year]';
 
+  // Pass the return redirect URL and stored credit card token to Braintree.
+  $form['tr_data'] = array(
+    '#type' => 'hidden',
+    '#name' => 'tr_data',
+    '#default_value' => Braintree_TransparentRedirect::updateCreditCardData(array(
+      'redirectUrl' => url('user/commerce_braintree/update_card', array('absolute' => TRUE)),
+      'paymentMethodToken' => $form['card_data']['#value']->remote_id,
+    )),
+  );
+
+  // Submit this form directly to the Braintree server.
   $form['#action'] = Braintree_TransparentRedirect::url();
 }
 
