@@ -1,10 +1,9 @@
-name = Commerce Braintree Payment method
-description = Add the Braintree payment method
+name = Braintree
+description = Integrates Braintree Transparent Redirect for on-site credit card payment with Commerce Card on File support if available.
 package = Commerce (contrib)
 core = 7.x
-configure = admin/commerce/config/payment-methods
+dependencies[] = commerce_order
 dependencies[] = commerce_payment
-dependencies[] = commerce_cardonfile
 
 ; Tests
 files[] = tests/commerce_braintree.test

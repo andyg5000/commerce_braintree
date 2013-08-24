@@ -2,9 +2,11 @@
 
 /**
  * @file
- * Implementations of the Braintree payment gateway
- * (http://braintreepayments.com) for drupal commerce.
+ * Integrates Braintree Transparent Redirect with Drupal Commerce.
+ *
+ * @see https://www.braintreepayments.com
  */
+
 
 /**
  * Implements hook_menu().
@@ -24,49 +26,15 @@ function commerce_braintree_menu() {
 }
 
 /**
- * Implements hook_commerce_payment_method_info().
- */
-function commerce_braintree_commerce_payment_method_info() {
-  $payment_methods['braintree'] = array(
-    'base' => 'commerce_braintree',
-    'file' => 'commerce_braintree.commerce_braintree.inc',
-    'title' => t('Braintree'),
-    'short_title' => t('Braintree'),
-    'display_title' => t('Credit Card'),
-    'description' => t('Provide integration with Braintree.'),
-    'terminal' => FALSE,
-    'offsite' => TRUE,
-    'offsite_autoredirect' => FALSE,
-  );
-
-  $payment_methods['braintree_cof'] = array(
-    'base' => 'commerce_braintree_cof',
-    'file' => 'commerce_braintree.commerce_braintree_cof.inc',
-    'title' => t('Braintree - Card On File'),
-    'short_title' => t('Braintree Cardonfile'),
-    'display_title' => t('Credit Card'),
-    'description' => t('Provide integration with Braintree (integrated with Commerce Cardonfile.'),
-    'terminal' => FALSE,
-    'offsite' => TRUE,
-    'offsite_autoredirect' => FALSE,
-    'cardonfile' => array(
-      'update callback' => 'commerce_braintree_cardonfile_update_delete',
-      'delete callback' => 'commerce_braintree_cardonfile_update_delete',
-    ),
-  );
-
-  return $payment_methods;
-}
-
-/**
  * Menu callback. Get the query from Braintree when updating a credit card.
  */
 function commerce_braintree_update_card() {
   global $user;
   $feedback = commerce_braintree_get_feedback();
-  if ($feedback) {
-    $payment_method = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
-    _commerce_braintree_init_credentials($payment_method);
+  if (module_exists('commerce_cardonfile') && $feedback) {
+    // @todo Do not hardcode a specific payment method instance ID.
+    $payment_method = commerce_payment_method_instance_load('braintree_tr|commerce_payment_braintree_tr');
+    commerce_braintree_initialize($payment_method);
     $result = Braintree_TransparentRedirect::confirm($feedback);
     $token = $result->creditCard->_attributes['token'];
     $cardholderName = $result->creditCard->_attributes['cardholderName'];
@@ -89,11 +57,250 @@ function commerce_braintree_update_card() {
 }
 
 /**
- * Callback for card on file update or delete.
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_braintree_commerce_payment_method_info() {
+  $payment_methods['braintree_tr'] = array(
+    'base' => 'commerce_braintree_tr',
+    'title' => t('Braintree Transparent Redirect'),
+    'short_title' => t('Braintree TR'),
+    'display_title' => t('Credit card'),
+    'description' => t('Integrates with Braintree Transparent Redirect for secure on-site credit card payment.'),
+    'terminal' => FALSE,
+    'offsite' => TRUE,
+    'offsite_autoredirect' => FALSE,
+    'cardonfile' => array(
+      'update callback' => 'commerce_braintree_cardonfile_update_delete',
+      'delete callback' => 'commerce_braintree_cardonfile_update_delete',
+    )
+  );
+
+  return $payment_methods;
+}
+
+/**
+ * Returns the default settings for Braintree Transparent Redirect.
+ */
+function commerce_braintree_tr_default_settings() {
+  return array(
+    'merchant_id' => '',
+    'public_key' => '',
+    'private_key' => '',
+    'environment' => 'sandbox',
+    'cardonfile' => FALSE,
+  );
+}
+
+/**
+ * Payment method callback: Braintree Transparent Redirect settings form.
+ */
+function commerce_braintree_tr_settings_form($settings = array()) {
+  $form = array();
+
+  // Merge default settings into the stored settings array.
+  $settings = (array) $settings + commerce_braintree_tr_default_settings();
+
+  $form['merchant_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Merchant ID'),
+    '#default_value' => $settings['merchant_id'],
+    '#required' => TRUE,
+  );
+  $form['public_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Public key'),
+    '#default_value' => $settings['public_key'],
+    '#required' => TRUE,
+  );
+  $form['private_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Private key'),
+    '#default_value' => $settings['private_key'],
+    '#required' => TRUE,
+  );
+  $form['environment'] = array(
+    '#type' => 'radios',
+    '#title' => t('Braintree server'),
+    '#options' => array(
+      'sandbox' => ('Sandbox - use for testing, requires a Braintree Sandbox account'),
+      'production' => ('Production - use for processing real transactions'),
+    ),
+    '#default_value' => $settings['environment'],
+  );
+
+  if (module_exists('commerce_cardonfile')) {
+    $form['cardonfile'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable card on file support for this payment method using the Braintree Vault.'),
+      '#default_value' => $settings['cardonfile'],
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Payment method callback: Braintree Transparent Redirect form.
+ */
+function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payment_method) {
+  global $user;
+
+  // Initialize the Braintree client.
+  commerce_braintree_initialize($payment_method);
+  $context = commerce_braintree_payment_session_load($order->order_id);
+
+  list($amount, $customer_name, $country, $thoroughfare, $locality, $postal_code, $administrative_area, $customer_mail) = _commerce_braintree_get_transaction_informations($order);
+
+  // Retrieve the order balance instead of the order total, this allows you
+  // to pay your order with multiple payment methods.
+  $balance = commerce_payment_order_balance($order);
+  $amount = commerce_braintree_price_amount($balance['amount'], $balance['currency_code']);
+
+  if (empty($payment_method['settings']['cardonfile']) || $context === NULL || $context == 'new') {
+    // Build the credit card form first.
+    $form = commerce_braintree_credit_card_form($payment_method);
+
+    // Create a transaction data string using the Braintree client.
+    $trData = Braintree_TransparentRedirect::transactionData(array(
+      // Add transaction related data.
+      'transaction' => array(
+        'type' => Braintree_Transaction::SALE,
+        'amount' => $amount,
+        'customer' => array(
+          'firstName' => $customer_name,
+          'email' => $customer_mail,
+        ),
+        'billing' => array(
+          'countryCodeAlpha2' => $country,
+          'streetAddress' => $thoroughfare,
+          'firstName' => $customer_name,
+          'locality' => $locality,
+          'postalCode' => $postal_code,
+          'region' => $administrative_area,
+        ),
+        'options' => array(
+          'storeInVault' => TRUE,
+          'submitForSettlement' => TRUE,
+        ),
+      ),
+      'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    ));
+  }
+  elseif (module_exists('commerce_cardonfile')) {
+    // Load the selected card on file.
+    $card = commerce_cardonfile_load(commerce_braintree_payment_session_load($order->order_id));
+
+    // Create a transaction data string using the Braintree client.
+    $trData = Braintree_TransparentRedirect::transactionData(array(
+      // Add transaction related data.
+      'transaction' => array(
+        'type' => Braintree_Transaction::SALE,
+        'amount' => $amount,
+        'paymentMethodToken' => $card->remote_id,
+      ),
+      'redirectUrl' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE))
+    ));
+
+    $form['card']['#markup'] = theme('card_data_overview', array('card_data' => $card));
+  }
+
+  // Store the Transparent Redirect request data in the form.
+  $form['tr_data'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $trData,
+    '#name' => 'tr_data',
+  );
+
+  // Provide a submit button with a back link that returns to the payment
+  // redirect back URL, which sends the customer to the previous page.
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Process payment'),
+    '#suffix' => l(t('Cancel'), 'checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+  );
+
+  // Set the action URL to submit directly to Braintree's server.
+  $form['#action'] = Braintree_TransparentRedirect::url();
+
+  return $form;
+}
+
+/**
+ * Payment method callback: Braintree Transparent Redirect form validation.
+ */
+function commerce_braintree_tr_redirect_form_validate($order, $payment_method) {
+  if ($feedback = commerce_braintree_get_feedback()) {
+    // Process the transaction based on the parameters received.
+    commerce_braintree_tr_process_transaction($order, $payment_method, $feedback);
+    return TRUE;
+  }
+}
+
+/**
+ * Processes a Transparent Redirect transaction after the customer has returned.
+ *
+ * @param $order
+ *   The loaded order that is being processed
+ * @param $payment_method
+ *   The payment method settings
+ * @param $feedback
+ *   The parameters received from Braintree regarding the payment
+ * @param $redirect
+ *   Boolean indicating whether or not to call redirect functions.
+ */
+function commerce_braintree_tr_process_transaction($order, $payment_method, $feedback, $redirect = TRUE) {
+  // Initialize the Braintree client.
+  commerce_braintree_initialize($payment_method);
+
+  $result = Braintree_TransparentRedirect::confirm($feedback);
+  $context = commerce_braintree_payment_session_load($order->order_id);
+
+  if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) && ($context === NULL || $context == 'new') && $result->success) {
+    // Card on file parameters.
+    $new_card_data = array();
+    $new_card_data = commerce_cardonfile_new();
+    // uid: the user ID of the account the card data is being stored for.
+    $new_card_data->uid = $order->uid;
+    // payment_method: the name of the payment method the card was used for.
+    $new_card_data->payment_method = $payment_method['method_id'];
+    // instance_id: the payment method instance ID containing the credentials
+    // that will be used to reuse the card on file.
+    $new_card_data->instance_id = $payment_method['instance_id'];
+    // remote_id: the remote ID to the full card data at the payment gateway.
+    $new_card_data->remote_id = $result->transaction->_attributes['creditCard']['token'];
+    // card_type: short name of the credit card type if determined, based on the
+    // keys returned by commerce_payment_credit_card_types().
+    $new_card_data->card_type = $result->transaction->_attributes['creditCard']['cardType'];
+    // card_name: the name of the cardholder.
+    $new_card_data->card_name = $result->transaction->_attributes['creditCard']['cardholderName'];
+    // card_number: the last 4 digits of the credit card number.
+    $new_card_data->card_number = $result->transaction->_attributes['creditCard']['last4'];
+    // card_exp_month: the numeric representation of the expiration month.
+    $new_card_data->card_exp_month = $result->transaction->_attributes['creditCard']['expirationMonth'];
+    // card_exp_year: the four digit expiration year.
+    $new_card_data->card_exp_year = $result->transaction->_attributes['creditCard']['expirationYear'];
+    // status: integer status of the card data: inactive (0), active (1), or
+    // active and not deletable (2).
+    $new_card_data->status = 1;
+    // Save and log the creation of the new card on file.
+    $save = commerce_cardonfile_save($new_card_data);
+    watchdog('commerce_braintree', '@type ending in @number added for user @uid with token @token.', array(
+      '@type' => $new_card_data->card_type,
+      '@number' => $new_card_data->card_number,
+      '@uid' => $order->uid,
+      '@token' => $new_card_data->remote_id,
+    ));
+  }
+  commerce_braintree_payement_session_delete($order->order_id);
+  _commerce_braintree_default_process_transaction($result, $order, $payment_method, $redirect);
+}
+
+/**
+ * Payment method callback: Braintree Transparent Redirect card on file delete.
  */
 function commerce_braintree_cardonfile_update_delete($form, &$form_state, $payment_method, $card_data) {
-  if ($form['#id'] == 'commerce-cardonfile-delete-form') {
-    _commerce_braintree_init_credentials($payment_method);
+  if (module_exists('commerce_cardonfile') && $form['#id'] == 'commerce-cardonfile-delete-form') {
+    commerce_braintree_initialize($payment_method);
 
     try {
       $result = Braintree_CreditCard::delete($card_data->remote_id);
@@ -115,61 +322,13 @@ function commerce_braintree_cardonfile_update_delete($form, &$form_state, $payme
 }
 
 /**
- * Returns the default settings for the Braintree payment method.
- */
-function commerce_braintree_default_settings_form($settings = NULL) {
-  $default_currency = commerce_default_currency();
-
-  // Merge default settings into the stored settings array.
-  // Demonstration or production ?
-  $form['commerce_braintree_mode'] = array(
-    '#type' => 'select',
-    '#title' => t('Mode'),
-    '#options' => array(
-      'sandbox' => t('Sandbox'),
-      'production' => t('Production'),
-    ),
-    '#default_value' => isset($settings['commerce_braintree_mode']) ? $settings['commerce_braintree_mode'] : NULL,
-  );
-  $form['commerce_braintree_merchant_id'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Merchant ID'),
-    '#description' => t("The merchantID."),
-    '#size' => 30,
-    '#maxlength' => 128,
-    '#default_value' => isset($settings['commerce_braintree_merchant_id']) ? $settings['commerce_braintree_merchant_id'] : NULL,
-    '#required' => TRUE,
-  );
-  $form['commerce_braintree_public_key'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Public Key'),
-    '#description' => t("The publicKey."),
-    '#size' => 30,
-    '#maxlength' => 128,
-    '#default_value' => isset($settings['commerce_braintree_public_key']) ? $settings['commerce_braintree_public_key'] : NULL,
-    '#required' => TRUE,
-  );
-  $form['commerce_braintree_private_key'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Private Key'),
-    '#description' => t("The privateKey."),
-    '#size' => 40,
-    '#maxlength' => 128,
-    '#default_value' => isset($settings['commerce_braintree_private_key']) ? $settings['commerce_braintree_private_key'] : NULL,
-    '#required' => TRUE,
-  );
-
-  return $form;
-}
-
-/**
  * Implements hook_form_FORM_ID_alter().
  *
  * Alter the Payment checkout page to remove the default help text.
  */
 function commerce_braintree_form_commerce_checkout_form_payment_alter(&$form, &$form_state) {
   if (!empty($form['commerce_payment']['payment_method']['#default_value']) &&
-    strpos($form['commerce_payment']['payment_method']['#default_value'], 'braintree_cof') === 0) {
+    strpos($form['commerce_payment']['payment_method']['#default_value'], 'braintree_tr') === 0) {
     unset($form['help']);
   }
 }
@@ -178,16 +337,19 @@ function commerce_braintree_form_commerce_checkout_form_payment_alter(&$form, &$
  * Implements hook_form_alter().
  */
 function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
-  // If the current form ID is for a checkout form...
-  if (strpos($form_id, 'commerce_checkout_form_') === 0 && $form_id != 'commerce_checkout_form_payment') {
+  // If Card on File is enabeld and the current form ID is for a checkout page
+  // besides the payment redirect page...
+  if (module_exists('commerce_cardonfile') &&
+    strpos($form_id, 'commerce_checkout_form_') === 0 &&
+    $form_id != 'commerce_checkout_form_payment') {
     // And it specifies a valid checkout page...
     if (commerce_checkout_page_load(substr($form_id, 23))) {
       // And the current page's form includes the payment checkout pane...
       if (!empty($form['commerce_payment'])) {
         // Check to see if the currently selected payment method is Card on File
-        // enabled (via the cardonfile boolean in its info array).
+        // enabled (via the cardonfile boolean in its settings array).
         $payment_method = commerce_payment_method_instance_load($form['commerce_payment']['payment_method']['#default_value']);
-        if (!empty($payment_method['cardonfile'])) {
+        if (!empty($payment_method['settings']['cardonfile'])) {
 
           // Load any existing card data for the current payment method instance
           // and user.
@@ -281,30 +443,6 @@ function commerce_braintree_payment_session_load($order_id) {
 function commerce_braintree_payement_session_delete($order_id = NULL) {
   if ($order_id) {
     unset($_SESSION['order_' . $order_id]);
-  }
-}
-
-/**
- * Include necessary API files from braintree and init the credentials.
- *
- * @param array $payment_method
- *   The payement method array provided by Commerce. Credentials will be taken
- *   from that.
- */
-function _commerce_braintree_init_credentials($payment_method = array()) {
-  $credentials = array();
-  $credentials['commerce_braintree_mode'] = $payment_method['settings']['commerce_braintree_mode'];
-  $credentials['commerce_braintree_merchant_id'] = $payment_method['settings']['commerce_braintree_merchant_id'];
-  $credentials['commerce_braintree_public_key'] = $payment_method['settings']['commerce_braintree_public_key'];
-  $credentials['commerce_braintree_private_key'] = $payment_method['settings']['commerce_braintree_private_key'];
-
-  // Include Braintree API.
-  require_once drupal_get_path('module', 'commerce_braintree') . '/braintree_php/lib/Braintree.php';
-  if (!empty($credentials)) {
-    Braintree_Configuration::environment($credentials['commerce_braintree_mode']);
-    Braintree_Configuration::merchantId($credentials['commerce_braintree_merchant_id']);
-    Braintree_Configuration::publicKey($credentials['commerce_braintree_public_key']);
-    Braintree_Configuration::privateKey($credentials['commerce_braintree_private_key']);
   }
 }
 
@@ -444,8 +582,8 @@ function commerce_braintree_module_implements_alter(&$implementations, $hook) {
  */
 function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &$form_state) {
   // @todo Do not hard code a requirement on a specific payment method instance.
-  $payment_method = commerce_payment_method_instance_load('braintree_cof|commerce_payment_braintree_cof');
-  _commerce_braintree_init_credentials($payment_method);
+  $payment_method = commerce_payment_method_instance_load('braintree_tr|commerce_payment_braintree_tr');
+  commerce_braintree_initialize($payment_method);
 
   // Adjust the names of form elements to match the requirements of Braintree's
   // Transparent Redirect API.
@@ -466,22 +604,6 @@ function commerce_braintree_form_commerce_cardonfile_update_form_alter(&$form, &
 
   // Submit this form directly to the Braintree server.
   $form['#action'] = Braintree_TransparentRedirect::url();
-}
-
-/**
- * Provide the cancel and return url used when calling the payment provider.
- */
-function _commerce_braintree_set_feedback_url($order, $payment_method) {
-  // Set feedback URLs.
-  $settings = array(
-    // Return to the previous page when payment is canceled.
-    'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-    // Return to the payment redirect page for processing successful payments.
-    'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-    // Specify the current payment method instance ID in the notify_url
-    'payment_method' => $payment_method['instance_id'],
-  );
-  return $settings;
 }
 
 /**
@@ -533,7 +655,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
   // Check if we already have this transaction stores in Commerce.
   $transaction_id = isset($transaction->id) ? commerce_braintree_get_payment_transaction($transaction->id) : NULL;
   if (!$transaction_id) {
-    $commerce_transaction = commerce_payment_transaction_new('braintree', $order->order_id);
+    $commerce_transaction = commerce_payment_transaction_new($payment_method['method_id'], $order->order_id);
   }
   else {
     $commerce_transaction = commerce_payment_transaction_load($transaction_id);
@@ -571,4 +693,36 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
       commerce_payment_redirect_pane_next_page($order);
     }
   }
+}
+
+/**
+ * Initializes the Braintree client library for use.
+ *
+ * @param $payment_method
+ *   The payment method instance containing the Braintree credentials to use to
+ *   submit API requests to Braintree.
+ */
+function commerce_braintree_initialize($payment_method) {
+  require_once drupal_get_path('module', 'commerce_braintree') . '/braintree_php/lib/Braintree.php';
+
+  Braintree_Configuration::merchantId($payment_method['settings']['merchant_id']);
+  Braintree_Configuration::publicKey($payment_method['settings']['public_key']);
+  Braintree_Configuration::privateKey($payment_method['settings']['private_key']);
+  Braintree_Configuration::environment($payment_method['settings']['environment']);
+}
+
+/**
+ * Formats a price amount into a decimal value as expected by Braintree.
+ *
+ * @param $amount
+ *   An integer price amount.
+ * @param $currency_code
+ *   The currency code of the price.
+ *
+ * @return
+ *   The decimal price amount as expected by Braintree API servers.
+ */
+function commerce_braintree_price_amount($amount, $currency_code) {
+  $rounded_amount = commerce_currency_round($amount, commerce_currency_load($currency_code));
+  return number_format(commerce_currency_amount_to_decimal($rounded_amount, $currency_code), 2, '.', '');
 }

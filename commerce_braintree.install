@@ -4,11 +4,17 @@
  * Implements hook_enable().
  */
 function commerce_braintree_enable() {
+  // If Card on File is already enabled, fetch its weight.
   $weight = db_select('system', 's')
     ->fields('s', array('weight'))
     ->condition('name', 'commerce_cardonfile', '=')
     ->execute()
     ->fetchField();
+
+  // If it wasn't found, pick an arbitrary high weight.
+  if ($weight === FALSE) {
+    $weight = 1000;
+  }
 
   db_update('system')
     ->fields(array(
