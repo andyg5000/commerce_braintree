@@ -1,13 +1,6 @@
 <?php
 /**
  * Braintree CreditCard module
- *
- * @package    Braintree
- * @category   Resources
- * @copyright  2010 Braintree Payment Solutions
- */
-
-/**
  * Creates and manages Braintree CreditCards
  *
  * <b>== More information ==</b>
@@ -17,7 +10,7 @@
  *
  * @package    Braintree
  * @category   Resources
- * @copyright  2010 Braintree Payment Solutions
+ * @copyright  2014 Braintree, a division of PayPal, Inc.
  *
  * @property-read string $billingAddress
  * @property-read string $bin
@@ -28,6 +21,7 @@
  * @property-read string $expirationDate
  * @property-read string $expirationMonth
  * @property-read string $expirationYear
+ * @property-read string $imageUrl
  * @property-read string $last4
  * @property-read string $maskedNumber
  * @property-read string $token
@@ -77,6 +71,9 @@ class Braintree_CreditCard extends Braintree
     const COMMERCIAL_YES = 'Yes';
     const COMMERCIAL_NO = 'No';
     const COMMERCIAL_UNKNOWN = 'Unknown';
+
+    const COUNTRY_OF_ISSUANCE_UNKNOWN = "Unknown";
+    const ISSUING_BANK_UNKNOWN = "Unknown";
 
     public static function create($attribs)
     {
@@ -150,7 +147,7 @@ class Braintree_CreditCard extends Braintree
     {
         $response = Braintree_Http::post("/payment_methods/all/expired", array('search' => array('ids' => $ids)));
 
-        return braintree_util::extractattributeasarray(
+        return Braintree_Util::extractattributeasarray(
             $response['paymentMethods'],
             'creditCard'
         );
@@ -196,11 +193,33 @@ class Braintree_CreditCard extends Braintree
     {
         self::_validateId($token);
         try {
-            $response = Braintree_Http::get('/payment_methods/'.$token);
+            $response = Braintree_Http::get('/payment_methods/credit_card/'.$token);
             return self::factory($response['creditCard']);
         } catch (Braintree_Exception_NotFound $e) {
             throw new Braintree_Exception_NotFound(
                 'credit card with token ' . $token . ' not found'
+            );
+        }
+
+    }
+
+    /**
+     * Convert a payment method nonce to a credit card
+     *
+     * @access public
+     * @param string $nonce payment method nonce
+     * @return object Braintree_CreditCard
+     * @throws Braintree_Exception_NotFound
+     */
+    public static function fromNonce($nonce)
+    {
+        self::_validateId($nonce, "nonce");
+        try {
+            $response = Braintree_Http::get('/payment_methods/from_nonce/'.$nonce);
+            return self::factory($response['creditCard']);
+        } catch (Braintree_Exception_NotFound $e) {
+            throw new Braintree_Exception_NotFound(
+                'credit card with nonce ' . $nonce . ' locked, consumed or not found'
             );
         }
 
@@ -292,7 +311,7 @@ class Braintree_CreditCard extends Braintree
     {
         Braintree_Util::verifyKeys(self::updateSignature(), $attributes);
         self::_validateId($token);
-        return self::_doUpdate('put', '/payment_methods/' . $token, array('creditCard' => $attributes));
+        return self::_doUpdate('put', '/payment_methods/credit_card/' . $token, array('creditCard' => $attributes));
     }
 
     /**
@@ -367,10 +386,20 @@ class Braintree_CreditCard extends Braintree
         return $this->expired;
     }
 
+    /**
+     * checks whether the card is associated with venmo sdk
+     *
+     * @return boolean
+     */
+    public function isVenmoSdk()
+    {
+        return $this->venmoSdk;
+    }
+
     public static function delete($token)
     {
         self::_validateId($token);
-        Braintree_Http::delete('/payment_methods/' . $token);
+        Braintree_Http::delete('/payment_methods/credit_card/' . $token);
         return new Braintree_Result_Successful();
     }
 
@@ -418,14 +447,15 @@ class Braintree_CreditCard extends Braintree
 
     private static function baseOptions()
     {
-        return array('makeDefault', 'verificationMerchantAccountId', 'verifyCard');
+        return array('makeDefault', 'verificationMerchantAccountId', 'verifyCard', 'venmoSdkSession');
     }
 
     private static function baseSignature($options)
     {
          return array(
-             'billingAddressId', 'cardholderName', 'cvv', 'number',
-             'expirationDate', 'expirationMonth', 'expirationYear', 'token',
+             'billingAddressId', 'cardholderName', 'cvv', 'number', 'deviceSessionId',
+             'expirationDate', 'expirationMonth', 'expirationYear', 'token', 'venmoSdkPaymentMethodCode',
+             'deviceData', 'fraudMerchantId', 'paymentMethodNonce',
              array('options' => $options),
              array(
                  'billingAddress' => array(
@@ -503,21 +533,22 @@ class Braintree_CreditCard extends Braintree
     }
 
     /**
-     * verifies that a valid credit card token is being used
+     * verifies that a valid credit card identifier is being used
      * @ignore
-     * @param string $token
+     * @param string $identifier
+     * @param Optional $string $identifierType type of identifier supplied, default "token"
      * @throws InvalidArgumentException
      */
-    private static function _validateId($token = null)
+    private static function _validateId($identifier = null, $identifierType = "token")
     {
-        if (empty($token)) {
+        if (empty($identifier)) {
            throw new InvalidArgumentException(
                    'expected credit card id to be set'
                    );
         }
-        if (!preg_match('/^[0-9A-Za-z_-]+$/', $token)) {
+        if (!preg_match('/^[0-9A-Za-z_-]+$/', $identifier)) {
             throw new InvalidArgumentException(
-                    $token . ' is an invalid credit card id.'
+                    $identifier . ' is an invalid credit card ' . $identifierType . '.'
                     );
         }
     }

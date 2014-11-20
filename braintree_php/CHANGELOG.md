@@ -1,3 +1,113 @@
+## 2.33.0
+* Allow descriptor to be passed in Funding Details options params for Merchant Account create and update.
+
+## 2.32.0
+* Add additionalProcessorResponse to Transaction
+
+## 2.31.1
+* Allow payee_email to be passed in options params for Transaction create
+
+## 2.31.0
+* Added paypal specific fields to transaction calls               
+* Added SettlementPending, SettlementDeclined transaction statuses
+
+## 2.30.0
+* Add descriptor url support
+
+## 2.29.0
+* Allow credit card verification options to be passed outside of the nonce for PaymentMethod.create
+* Allow billing_address parameters and billing_address_id to be passed outside of the nonce for PaymentMethod.create
+* Add Subscriptions to paypal accounts
+* Add PaymentMethod.update
+* Add fail_on_duplicate_payment_method option to PaymentMethod.create
+
+## 2.28.0
+* Adds support for v.zero SDKs.
+
+## 2.27.2
+
+* Make webhook parsing more robust with newlines
+* Add messages to InvalidSignature exceptions
+
+## 2.27.1
+
+* Updated secureCompare to correctly compare strings in consistent time
+* Add better error messages around webhook verification
+
+## 2.27.0
+
+* Include Dispute information on Transaction
+* Search for Transactions disputed on a certain date
+
+## 2.26.0
+
+* Disbursement Webhooks
+
+## 2.25.1
+
+* Fix factories on AddOn and Discount (thanks [stewe](https://github.com/stewe))
+* Allow billingAddressId on transaction create
+
+## 2.25.0
+
+* Merchant account find API
+
+## 2.24.0
+
+* Merchant account update API
+* Merchant account create API v2
+
+## 2.23.1
+
+* Update configuration URLs
+
+## 2.23.0
+
+* Official Partnership support
+
+## 2.22.2
+
+* Add Partner Merchant Declined webhook
+* use preg_callback_replace instead of preg_replace (thanks [jonthornton](https://github.com/jonthornton)!)
+
+## 2.22.1
+
+* Adds missing test contstant to library namespace
+
+## 2.22.0
+
+* Adds holdInEscrow method
+* Add error codes for verification not supported error
+* Add companyName and taxId to merchant account create
+* Adds cancelRelease method
+* Adds releaseFromEscrow functionality
+* Adds phone to merchant account signature.
+* Adds merchant account phone error code.
+* Fix casing issues with Braintree\_Http and Braintree\_Util references (thanks [steven-hadfield](https://github.com/steven-hadfield)!)
+* Fixed transaction initialization arguments to be optional (thanks [karolsojko](https://github.com/karolsojko)!)
+
+## 2.21.0
+
+* Enable device data.
+
+## 2.20.0
+
+* Fixed getting custom fields with valueForHtmlField. [Thanks to Miguel Manso for the fix.](https://github.com/mumia)
+* Adds disbursement details to transactions.
+* Adds image url to transactions.
+
+## 2.19.0
+
+* Adds channel field to transactions.
+
+## 2.18.0
+
+* Adds country of issuance and issuing bank bin database fields
+
+## 2.17.0
+
+* Adds verification search
+
 ## 2.16.0
 
 * Additional card information, such as prepaid, debit, commercial, Durbin regulated, healthcare, and payroll, are returned on credit card responses
@@ -192,4 +302,3 @@
 ## 1.0.0
 
 * Initial release
-

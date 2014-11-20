@@ -1,5 +1,6 @@
 <?php
 require_once realpath(dirname(__FILE__)) . '/../TestHelper.php';
+require_once realpath(dirname(__FILE__)) . '/HttpClientApi.php';
 
 class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
 {
@@ -13,13 +14,9 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
     {
         $collection = Braintree_Customer::all();
         $this->assertTrue($collection->maximumCount() > 1);
-
-        $arr = array();
-        foreach($collection as $customer) {
-            array_push($arr, $customer->id);
-        }
-        $unique_customer_ids = array_unique(array_values($arr));
-        $this->assertEquals($collection->maximumCount(), count($unique_customer_ids));
+        $customer = $collection->firstItem();
+        $this->assertTrue(intval($customer->id) > 0);
+        $this->assertTrue($customer instanceof Braintree_Customer);
     }
 
     function testCreate()
@@ -43,6 +40,28 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('419.555.1235', $customer->fax);
         $this->assertEquals('http://example.com', $customer->website);
         $this->assertNotNull($customer->merchantId);
+    }
+
+    function testCreateCustomerWithCardUsingNonce()
+    {
+        $nonce = Braintree_HttpClientApi::nonce_for_new_card(array(
+            "creditCard" => array(
+                "number" => "4111111111111111",
+                "expirationMonth" => "11",
+                "expirationYear" => "2099"
+            ),
+            "share" => true
+        ));
+
+        $result = Braintree_Customer::create(array(
+            'creditCard' => array(
+                'paymentMethodNonce' => $nonce
+            )
+        ));
+
+        $this->assertTrue($result->success);
+        $this->assertSame("411111", $result->customer->creditCards[0]->bin);
+        $this->assertSame("1111", $result->customer->creditCards[0]->last4);
     }
 
     function testCreate_withUnicode()
@@ -93,6 +112,38 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(1, preg_match('/\A\w{32}\z/', $customer->creditCards[0]->uniqueNumberIdentifier));
     }
 
+    function testCreate_withVenmoSdkSession()
+    {
+        $result = Braintree_Customer::create(array(
+            'firstName' => 'Bat',
+            'lastName' => 'Manderson',
+            'creditCard' => array(
+                'number' => '5105105105105100',
+                'expirationDate' => '05/12',
+                'options' => array(
+                    'venmoSdkSession' => Braintree_Test_VenmoSdk::getTestSession()
+                )
+            )
+        ));
+        $this->assertEquals(true, $result->success);
+        $customer = $result->customer;
+        $this->assertEquals(true, $customer->creditCards[0]->venmoSdk);
+    }
+
+    function testCreate_withVenmoSdkPaymentMethodCode()
+    {
+        $result = Braintree_Customer::create(array(
+            'firstName' => 'Bat',
+            'lastName' => 'Manderson',
+            'creditCard' => array(
+                'venmoSdkPaymentMethodCode' => Braintree_Test_VenmoSdk::$visaPaymentMethodCode
+            )
+        ));
+        $this->assertEquals(true, $result->success);
+        $customer = $result->customer;
+        $this->assertEquals("411111", $customer->creditCards[0]->bin);
+    }
+
     function testCreate_blankCustomer()
     {
         $result = Braintree_Customer::create();
@@ -122,6 +173,22 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(true, $result->success);
         $customFields = $result->customer->customFields;
         $this->assertEquals('some custom value', $customFields['store_me']);
+    }
+
+    function testCreate_withFraudParams()
+    {
+        $result = Braintree_Customer::create(array(
+            'firstName' => 'Mike',
+            'creditCard' => array(
+                'number' => '5105105105105100',
+                'expirationDate' => '05/12',
+                'cvv' => '123',
+                'cardholderName' => 'Mike Jones',
+                'deviceSessionId' => 'abc123',
+                'fraudMerchantId' => '456'
+            )
+        ));
+        $this->assertEquals(true, $result->success);
     }
 
     function testCreate_withCreditCard()
@@ -330,6 +397,30 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
     {
         $this->setExpectedException('Braintree_Exception_ValidationsFailed');
         $customer = Braintree_Customer::createNoValidate(array('email' => 'invalid'));
+    }
+
+    function testCreate_worksWithFuturePayPalNonce()
+    {
+        $nonce = Braintree_Test_Nonces::$paypalFuturePayment;
+
+        $result = Braintree_Customer::create(array(
+            'paymentMethodNonce' => $nonce
+        ));
+
+        $this->assertTrue($result->success);
+    }
+
+    function testCreate_doesNotWorkWithOnetimePayPalNonce()
+    {
+        $nonce = Braintree_Test_Nonces::$paypalOneTimePayment;
+
+        $result = Braintree_Customer::create(array(
+            'paymentMethodNonce' => $nonce
+        ));
+
+        $this->assertFalse($result->success);
+        $errors = $result->errors->forKey('customer')->forKey('paypalAccount')->errors;
+        $this->assertEquals(Braintree_Error_Codes::PAYPAL_ACCOUNT_CANNOT_VAULT_ONE_TIME_USE_PAYPAL_ACCOUNT, $errors[0]->code);
     }
 
     function testDelete_deletesTheCustomer()
@@ -554,6 +645,69 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
         $billingAddress = $result->customer->creditCards[0]->billingAddress;
         $this->assertEquals($address->id, $billingAddress->id);
         $this->assertEquals('Dan', $billingAddress->firstName);
+    }
+
+    function testUpdate_worksWithFuturePayPalNonce()
+    {
+        $customerResult = Braintree_Customer::create(array(
+            'creditCard' => array(
+                'number' => '5105105105105100',
+                'expirationDate' => '05/12',
+                'options' => array(
+                    'makeDefault' => true
+                )
+            )
+        ));
+        $paypalAccountToken = 'PAYPALToken-' . strval(rand());
+        $nonce = Braintree_HttpClientApi::nonceForPayPalAccount(array(
+            'paypal_account' => array(
+                'consent_code' => 'PAYPAL_CONSENT_CODE',
+                'token' => $paypalAccountToken,
+                'options' => array(
+                    'makeDefault' => true
+                )
+            )
+        ));
+
+        $result = Braintree_Customer::update($customerResult->customer->id, array(
+            'paymentMethodNonce' => $nonce
+        ));
+
+        $this->assertTrue($result->success);
+        $this->assertEquals($result->customer->defaultPaymentMethod()->token, $paypalAccountToken);
+
+    }
+
+    function testUpdate_doesNotWorkWithOnetimePayPalNonce()
+    {
+        $customerResult = Braintree_Customer::create(array(
+            'creditCard' => array(
+                'number' => '5105105105105100',
+                'expirationDate' => '05/12',
+                'options' => array(
+                    'makeDefault' => true
+                )
+            )
+        ));
+        $paypalAccountToken = 'PAYPALToken-' . strval(rand());
+        $nonce = Braintree_HttpClientApi::nonceForPayPalAccount(array(
+            'paypal_account' => array(
+                'access_token' => 'PAYPAL_ACCESS_TOKEN',
+                'token' => $paypalAccountToken,
+                'options' => array(
+                    'makeDefault' => true
+                )
+            )
+        ));
+
+        $result = Braintree_Customer::update($customerResult->customer->id, array(
+            'paymentMethodNonce' => $nonce
+        ));
+
+        $this->assertFalse($result->success);
+        $errors = $result->errors->forKey('customer')->forKey('paypalAccount')->errors;
+        $this->assertEquals(Braintree_Error_Codes::PAYPAL_ACCOUNT_CANNOT_VAULT_ONE_TIME_USE_PAYPAL_ACCOUNT, $errors[0]->code);
+
     }
 
     function testUpdateNoValidate()
@@ -945,5 +1099,3 @@ class Braintree_CustomerTest extends PHPUnit_Framework_TestCase
         );
     }
 }
-?>
-

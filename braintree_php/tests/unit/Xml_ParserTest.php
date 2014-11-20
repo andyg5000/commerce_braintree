@@ -49,7 +49,7 @@ XML;
         date_default_timezone_set('UTC');
         $dateTime = new DateTime('2009-10-28T10:19:49', new DateTimeZone('UTC'));
         $this->assertEquals(array('root' => array('createdAt' => $dateTime)), $array);
-        $this->assertType('DateTime', $array['root']['createdAt']);
+        $this->assertInstanceOf('DateTime', $array['root']['createdAt']);
     }
 
     function testTypeCastsDates()
@@ -157,6 +157,7 @@ XML;
   <amount>1.00</amount>
   <merchant-account-id>default</merchant-account-id>
   <order-id nil="true"></order-id>
+  <channel nil="true"></channel>
   <created-at type="datetime">2010-04-01T19:32:23Z</created-at>
   <updated-at type="datetime">2010-04-02T08:05:35Z</updated-at>
   <customer>
@@ -242,6 +243,7 @@ XML;
         $this->assertEquals(null, $array['transaction']['avsErrorResponseCode']);
         $this->assertEquals(null, $array['transaction']['refundId']);
         $this->assertEquals(null, $array['transaction']['orderId']);
+        $this->assertEquals(null, $array['transaction']['channel']);
         $this->assertEquals(null, $array['transaction']['customer']['fax']);
         $this->assertEquals(null, $array['transaction']['creditCard']['token']);
         $this->assertEquals(null, $array['transaction']['creditCard']['cardholderName']);
@@ -328,6 +330,7 @@ END;
             <amount>54.32</amount>
             <merchant-account-id>sandbox_credit_card</merchant-account-id>
             <order-id nil="true"></order-id>
+            <channel nil="true"></channel>
             <created-at type="datetime">2010-07-02T15:52:09Z</created-at>
             <updated-at type="datetime">2010-07-02T15:52:09Z</updated-at>
             <customer>
@@ -498,7 +501,7 @@ XML;
 
         $this->assertEquals($xml, $xml2);
     }
-    
+
     function testIncludesTheEncodingRoundtrip()
     {
         $array = array('root' => array(
@@ -508,7 +511,7 @@ XML;
         $this->assertRegExp('<\?xml version=\"1.0\" encoding=\"UTF-8\"\?>', $xml);
 
     }
-    
+
     function testRootNodeAndStringRoundtrip()
     {
         $array = array('id' => '123');
@@ -516,4 +519,3 @@ XML;
         $this->assertEquals($array, $array2);
     }
 }
-?>

@@ -1,7 +1,5 @@
 <?php
 
-require_once 'PHPUnit/Framework.php';
-
 set_include_path(
   get_include_path() . PATH_SEPARATOR .
   realpath(dirname(__FILE__)) . '/../lib'
@@ -9,6 +7,7 @@ set_include_path(
 
 require_once "Braintree.php";
 require_once "Braintree/CreditCardNumbers/CardTypeIndicators.php";
+require_once "Braintree/CreditCardDefaults.php";
 
 function integrationMerchantConfig()
 {
@@ -42,6 +41,16 @@ class Braintree_TestHelper
         return 'sandbox_credit_card_non_default';
     }
 
+    public static function nonDefaultSubMerchantAccountId()
+    {
+        return 'sandbox_sub_merchant_account';
+    }
+
+    public static function threeDSecureMerchantAccountId()
+    {
+        return 'three_d_secure_merchant_account';
+    }
+
     public static function createViaTr($regularParams, $trParams)
     {
         $trData = Braintree_TransparentRedirect::transactionData(
@@ -69,7 +78,7 @@ class Braintree_TestHelper
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curl);
         curl_close($curl);
-        preg_match('/Location: .*\?(.*)/', $response, $match);
+        preg_match('/Location: .*\?(.*)/i', $response, $match);
         return trim($match[1]);
     }
 
@@ -105,12 +114,38 @@ class Braintree_TestHelper
         Braintree_Http::put('/transactions/' . $transactionId . '/settle');
     }
 
+    public static function settlementDecline($transactionId)
+    {
+        Braintree_Http::put('/transactions/' . $transactionId . '/settlement_decline');
+    }
+
+    public static function settlementPending($transactionId)
+    {
+        Braintree_Http::put('/transactions/' . $transactionId . '/settlement_pending');
+    }
+
+    public static function escrow($transactionId)
+    {
+        Braintree_Http::put('/transactions/' . $transactionId . '/escrow');
+    }
+
+    public static function create3DSVerification($merchantAccountId, $params)
+    {
+        $response = Braintree_Http::post('/three_d_secure/create_verification/' . $merchantAccountId, array(
+            'threeDSecureVerification' => $params
+        ));
+        return $response['threeDSecureVerification']['threeDSecureToken'];
+    }
+
     public static function nowInEastern()
     {
         $eastern = new DateTimeZone('America/New_York');
         $now = new DateTime('now', $eastern);
         return $now->format('Y-m-d');
     }
-}
 
-?>
+    public static function decodedClientToken($params=array()) {
+        $encodedClientToken = Braintree_ClientToken::generate($params);
+        return base64_decode($encodedClientToken);
+    }
+}

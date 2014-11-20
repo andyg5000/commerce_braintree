@@ -1,13 +1,6 @@
 <?php
 /**
  * Braintree Customer module
- *
- * @package    Braintree
- * @category   Resources
- * @copyright  2010 Braintree Payment Solutions
- */
-
-/**
  * Creates and manages Customers
  *
  * <b>== More information ==</b>
@@ -16,12 +9,13 @@
  *
  * @package    Braintree
  * @category   Resources
- * @copyright  2010 Braintree Payment Solutions
- * 
+ * @copyright  2014 Braintree, a division of PayPal, Inc.
+ *
  * @property-read array  $addresses
  * @property-read string $company
  * @property-read string $createdAt
  * @property-read array  $creditCards
+ * @property-read array  $paypalAccounts
  * @property-read array  $customFields custom fields passed with the request
  * @property-read string $email
  * @property-read string $fax
@@ -36,7 +30,7 @@ class Braintree_Customer extends Braintree
 {
     public static function all()
     {
-        $response = braintree_http::post('/customers/advanced_search_ids');
+        $response = Braintree_Http::post('/customers/advanced_search_ids');
         $pager = array(
             'className' => __CLASS__,
             'classMethod' => 'fetch',
@@ -53,9 +47,9 @@ class Braintree_Customer extends Braintree
             $criteria[$term->name] = $term->toparam();
         }
         $criteria["ids"] = Braintree_CustomerSearch::ids()->in($ids)->toparam();
-        $response = braintree_http::post('/customers/advanced_search', array('search' => $criteria));
+        $response = Braintree_Http::post('/customers/advanced_search', array('search' => $criteria));
 
-        return braintree_util::extractattributeasarray(
+        return Braintree_Util::extractattributeasarray(
             $response['customers'],
             'customer'
         );
@@ -150,7 +144,8 @@ class Braintree_Customer extends Braintree
         unset($creditCardSignature['customerId']);
         $signature = array(
             'id', 'company', 'email', 'fax', 'firstName',
-            'lastName', 'phone', 'website',
+            'lastName', 'phone', 'website', 'deviceData',
+            'deviceSessionId', 'fraudMerchantId', 'paymentMethodNonce',
             array('creditCard' => $creditCardSignature),
             array('customFields' => array('_anyKey_')),
             );
@@ -173,7 +168,8 @@ class Braintree_Customer extends Braintree
 
         $signature = array(
             'id', 'company', 'email', 'fax', 'firstName',
-            'lastName', 'phone', 'website',
+            'lastName', 'phone', 'website', 'deviceData',
+            'deviceSessionId', 'fraudMerchantId', 'paymentMethodNonce',
             array('creditCard' => $creditCardSignature),
             array('customFields' => array('_anyKey_')),
             );
@@ -299,10 +295,15 @@ class Braintree_Customer extends Braintree
     {
         $criteria = array();
         foreach ($query as $term) {
+            $result = $term->toparam();
+            if(is_null($result) || empty($result)) {
+                throw new InvalidArgumentException('Operator must be provided');
+            }
+
             $criteria[$term->name] = $term->toparam();
         }
 
-        $response = braintree_http::post('/customers/advanced_search_ids', array('search' => $criteria));
+        $response = Braintree_Http::post('/customers/advanced_search_ids', array('search' => $criteria));
         $pager = array(
             'className' => __CLASS__,
             'classMethod' => 'fetch',
@@ -410,15 +411,23 @@ class Braintree_Customer extends Braintree
         }
         $this->_set('addresses', $addressArray);
 
-        // map each creditcard into its own object
-        $ccArray = array();
+        // map each creditCard into its own object
+        $creditCardArray = array();
         if (isset($customerAttribs['creditCards'])) {
             foreach ($customerAttribs['creditCards'] AS $creditCard) {
-                $ccArray[] = Braintree_CreditCard::factory($creditCard);
+                $creditCardArray[] = Braintree_CreditCard::factory($creditCard);
             }
         }
-        $this->_set('creditCards', $ccArray);
+        $this->_set('creditCards', $creditCardArray);
 
+        // map each paypalAccount into its own object
+        $paypalAccountArray = array();
+        if (isset($customerAttribs['paypalAccounts'])) {
+            foreach ($customerAttribs['paypalAccounts'] AS $paypalAccount) {
+                $paypalAccountArray[] = Braintree_PayPalAccount::factory($paypalAccount);
+            }
+        }
+        $this->_set('paypalAccounts', $paypalAccountArray);
     }
 
     /**
@@ -441,6 +450,32 @@ class Braintree_Customer extends Braintree
     public function isEqual($otherCust)
     {
         return !($otherCust instanceof Braintree_Customer) ? false : $this->id === $otherCust->id;
+    }
+
+    /**
+     * returns an array containt all of the customer's payment methods
+     *
+     * @return array
+     */
+    public function paymentMethods()
+    {
+        return array_merge($this->creditCards, $this->paypalAccounts);
+    }
+
+    /**
+     * returns the customer's default payment method
+     *
+     * @return object Braintree_CreditCard or Braintree_PayPalAccount
+     */
+    public function defaultPaymentMethod()
+    {
+        $defaultPaymentMethods = array_filter($this->paymentMethods(), 'Braintree_Customer::_defaultPaymentMethodFilter');
+        return current($defaultPaymentMethods);
+    }
+
+    public static function _defaultPaymentMethodFilter($paymentMethod)
+    {
+        return $paymentMethod->isDefault();
     }
 
     /* private class properties  */

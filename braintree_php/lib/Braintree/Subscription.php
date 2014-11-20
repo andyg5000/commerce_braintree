@@ -9,7 +9,7 @@
  * PHP Version 5
  *
  * @package   Braintree
- * @copyright 2010 Braintree Payment Solutions
+ * @copyright 2014 Braintree, a division of PayPal, Inc.
  */
 class Braintree_Subscription extends Braintree
 {
@@ -58,7 +58,7 @@ class Braintree_Subscription extends Braintree
         }
 
 
-        $response = braintree_http::post('/subscriptions/advanced_search_ids', array('search' => $criteria));
+        $response = Braintree_Http::post('/subscriptions/advanced_search_ids', array('search' => $criteria));
         $pager = array(
             'className' => __CLASS__,
             'classMethod' => 'fetch',
@@ -119,17 +119,20 @@ class Braintree_Subscription extends Braintree
             array(
                 'billingDayOfMonth',
                 'firstBillingDate',
+                'createdAt',
+                'updatedAt',
                 'id',
                 'merchantAccountId',
                 'neverExpires',
                 'numberOfBillingCycles',
                 'paymentMethodToken',
+                'paymentMethodNonce',
                 'planId',
                 'price',
                 'trialDuration',
                 'trialDurationUnit',
                 'trialPeriod',
-                array('descriptor' => array('name', 'phone')),
+                array('descriptor' => array('name', 'phone', 'url')),
                 array('options' => array('doNotInheritAddOnsOrDiscounts', 'startImmediately')),
             ),
             self::_addOnDiscountSignature()
@@ -141,8 +144,8 @@ class Braintree_Subscription extends Braintree
         return array_merge(
             array(
                 'merchantAccountId', 'numberOfBillingCycles', 'paymentMethodToken', 'planId',
-                'id', 'neverExpires', 'price',
-                array('descriptor' => array('name', 'phone')),
+                'paymentMethodNonce', 'id', 'neverExpires', 'price',
+                array('descriptor' => array('name', 'phone', 'url')),
                 array('options' => array('prorateCharges', 'replaceAllAddOnsAndDiscounts', 'revertSubscriptionOnProrationFailure')),
             ),
             self::_addOnDiscountSignature()

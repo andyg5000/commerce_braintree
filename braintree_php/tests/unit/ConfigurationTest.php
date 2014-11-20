@@ -25,7 +25,7 @@ class Braintree_ConfigurationTest extends PHPUnit_Framework_TestCase
 
      /**
      * @expectedException Braintree_Exception_Configuration
-     * @expectedExceptionMessage environment needs to be set
+     * @expectedExceptionMessage "invalid" is not a valid environment.
      */
     function testSetInvalidEnvironment()
     {
@@ -118,11 +118,32 @@ class Braintree_ConfigurationTest extends PHPUnit_Framework_TestCase
 
         Braintree_Configuration::environment('sandbox');
         $sn = Braintree_Configuration::serverName();
-        $this->assertEquals('sandbox.braintreegateway.com', $sn);
+        $this->assertEquals('api.sandbox.braintreegateway.com', $sn);
 
         Braintree_Configuration::environment('production');
         $sn = Braintree_Configuration::serverName();
-        $this->assertEquals('www.braintreegateway.com', $sn);
+        $this->assertEquals('api.braintreegateway.com', $sn);
+
+        Braintree_Configuration::reset();
+    }
+
+    function testAuthUrl()
+    {
+        Braintree_Configuration::environment('development');
+        $authUrl = Braintree_Configuration::authUrl();
+        $this->assertEquals('http://auth.venmo.dev:9292', $authUrl);
+
+        Braintree_Configuration::environment('qa');
+        $authUrl = Braintree_Configuration::authUrl();
+        $this->assertEquals('https://auth.qa.venmo.com', $authUrl);
+
+        Braintree_Configuration::environment('sandbox');
+        $authUrl = Braintree_Configuration::authUrl();
+        $this->assertEquals('https://auth.sandbox.venmo.com', $authUrl);
+
+        Braintree_Configuration::environment('production');
+        $authUrl = Braintree_Configuration::authUrl();
+        $this->assertEquals('https://auth.venmo.com', $authUrl);
 
         Braintree_Configuration::reset();
     }
@@ -132,7 +153,7 @@ class Braintree_ConfigurationTest extends PHPUnit_Framework_TestCase
         Braintree_Configuration::merchantId('abc123');
         Braintree_Configuration::environment('sandbox');
         $mu = Braintree_Configuration::merchantUrl();
-        $this->assertEquals('https://sandbox.braintreegateway.com:443/merchants/abc123', $mu);
+        $this->assertEquals('https://api.sandbox.braintreegateway.com:443/merchants/abc123', $mu);
 
         Braintree_Configuration::reset();
     }
@@ -141,7 +162,7 @@ class Braintree_ConfigurationTest extends PHPUnit_Framework_TestCase
     {
         Braintree_Configuration::environment('sandbox');
         $bu = Braintree_Configuration::baseUrl();
-        $this->assertEquals('https://sandbox.braintreegateway.com:443', $bu);
+        $this->assertEquals('https://api.sandbox.braintreegateway.com:443', $bu);
 
         Braintree_Configuration::reset();
     }
