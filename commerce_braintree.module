@@ -149,7 +149,7 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
   commerce_braintree_initialize($payment_method);
   $context = commerce_braintree_payment_session_load($order->order_id);
 
-  list($amount, $customer_name, $country, $thoroughfare, $locality, $postal_code, $administrative_area, $customer_mail) = _commerce_braintree_get_transaction_informations($order);
+  list($amount, $customer_name, $first_name, $last_name, $country, $thoroughfare, $locality, $postal_code, $administrative_area, $customer_mail) = _commerce_braintree_get_transaction_informations($order);
 
   // Retrieve the order balance instead of the order total, this allows you
   // to pay your order with multiple payment methods.
@@ -167,7 +167,8 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
         'type' => Braintree_Transaction::SALE,
         'amount' => $amount,
         'customer' => array(
-          'firstName' => $customer_name,
+          'firstName' => $first_name,
+          'lastName' => $last_name,
           'email' => $customer_mail,
         ),
         'billing' => array(
@@ -619,8 +620,20 @@ function _commerce_braintree_get_transaction_informations($order) {
   $currency_code = $wrapper->commerce_order_total->currency_code->value();
   $amount = $wrapper->commerce_order_total->amount->value();
 
-  // Customer data.
+  // Attempt to parse the first and last name if the name_line field is used.
   $customer_name = $wrapper->commerce_customer_billing->commerce_customer_address->name_line->value();
+  if (!empty($customer_name)) {
+    $name_parts = explode(' ', $customer_name);
+    $first_name = array_shift($name_parts);
+    $last_name = implode(' ', $name_parts);
+  }
+  else {
+    // Else grab each value separately.
+    $first_name = $wrapper->commerce_customer_billing->commerce_customer_address->first_name->value();
+    $last_name = $wrapper->commerce_customer_billing->commerce_customer_address->last_name->value();
+    $customer_name = $first_name . ' ' . $last_name;
+  }
+
   $country = $wrapper->commerce_customer_billing->commerce_customer_address->country->value();
   $thoroughfare = $wrapper->commerce_customer_billing->commerce_customer_address->thoroughfare->value();
   $locality = $wrapper->commerce_customer_billing->commerce_customer_address->locality->value();
@@ -631,6 +644,8 @@ function _commerce_braintree_get_transaction_informations($order) {
   return array(
     $amount,
     $customer_name,
+    $first_name,
+    $last_name,
     $country,
     $thoroughfare,
     $locality,
