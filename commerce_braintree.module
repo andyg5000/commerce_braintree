@@ -350,7 +350,7 @@ function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
         // Check to see if the currently selected payment method is Card on File
         // enabled (via the cardonfile boolean in its settings array).
         $payment_method = commerce_payment_method_instance_load($form['commerce_payment']['payment_method']['#default_value']);
-        if (!empty($payment_method['settings']['cardonfile'])) {
+        if ($payment_method['module'] == 'commerce_braintree' && !empty($payment_method['settings']['cardonfile'])) {
 
           // Load any existing card data for the current payment method instance
           // and user.
