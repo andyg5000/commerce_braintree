@@ -1,0 +1,6 @@
+name = Braintree (Drop-in UI)
+description = Integrates Braintree Drop-in UI for on-site credit card payment.
+package = Commerce (contrib)
+core = 7.x
+dependencies[] = commerce_braintree
+
