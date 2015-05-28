@@ -72,7 +72,7 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
   protected function getCredentials() {
     // Include Braintree API.
     // Using a test account.
-    require_once drupal_get_path('module', 'commerce_braintree') . '/braintree_php/lib/Braintree.php';
+    libraries_load('braintree_php');
     Braintree_Configuration::environment('sandbox');
     Braintree_Configuration::merchantId('y37hv7xmv9tqspcz');
     Braintree_Configuration::publicKey('25sz2yrhy4nr8vj7');

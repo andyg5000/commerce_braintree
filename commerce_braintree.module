@@ -26,6 +26,27 @@ function commerce_braintree_menu() {
 }
 
 /**
+ * Implements hook_libraries_info().
+ */
+function commerce_braintree_libraries_info() {
+  $libraries['braintree_php'] = array(
+    'name' => 'BrainTree PHP',
+    'vendor url' => 'https://www.braintreepayments.com/docs/php',
+    'download url' => 'https://github.com/braintree/braintree_php',
+    'version arguments' => array(
+      'file' => 'CHANGELOG.md',
+      'pattern' => '/^##\s+(.+)$/',
+      'lines' => 1,
+    ),
+    'files' => array(
+      'php' => array('lib/Braintree.php'),
+    ),
+  );
+  return $libraries;
+}
+
+
+/**
  * Menu callback. Get the query from Braintree when updating a credit card.
  */
 function commerce_braintree_update_card() {
@@ -744,7 +765,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
  *   submit API requests to Braintree.
  */
 function commerce_braintree_initialize($payment_method) {
-  require_once drupal_get_path('module', 'commerce_braintree') . '/braintree_php/lib/Braintree.php';
+  libraries_load('braintree_php');
 
   Braintree_Configuration::merchantId($payment_method['settings']['merchant_id']);
   Braintree_Configuration::publicKey($payment_method['settings']['public_key']);
