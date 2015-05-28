@@ -86,6 +86,7 @@ function commerce_braintree_tr_default_settings() {
     'merchant_id' => '',
     'public_key' => '',
     'private_key' => '',
+    'merchant_account_id' => '',
     'environment' => 'sandbox',
     'cardonfile' => FALSE,
   );
@@ -99,6 +100,10 @@ function commerce_braintree_tr_settings_form($settings = array()) {
 
   // Merge default settings into the stored settings array.
   $settings = (array) $settings + commerce_braintree_tr_default_settings();
+
+  // Get a list of enabled currencies
+
+  $currencies = commerce_currencies(TRUE);
 
   $form['merchant_id'] = array(
     '#type' => 'textfield',
@@ -118,6 +123,24 @@ function commerce_braintree_tr_settings_form($settings = array()) {
     '#default_value' => $settings['private_key'],
     '#required' => TRUE,
   );
+
+  // Braintree supports multiple currencies through the use of multiple merchant
+  // accounts.
+  // If there is more than one currency enabled, create forms for those too.
+  if (count($currencies) > 1) {
+    foreach ($currencies as $currency) {
+      $form['merchant_account_id'][$currency['code']] = array(
+        '#type' => 'textfield',
+        '#title' => t('Merchant account ' . $currency['code']),
+        '#description' => t('The merchant account for ' . $currency['code']),
+        '#size' => 30,
+        '#maxlength' => 128,
+        '#default_value' => isset($settings['merchant_account_id'][$currency['code']]) ? $settings['merchant_account_id'][$currency['code']] : NULL,
+        '#required' => FALSE,
+      );
+    }
+  }
+
   $form['environment'] = array(
     '#type' => 'radios',
     '#title' => t('Braintree server'),
@@ -155,6 +178,8 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
   // to pay your order with multiple payment methods.
   $balance = commerce_payment_order_balance($order);
   $amount = commerce_braintree_price_amount($balance['amount'], $balance['currency_code']);
+  // Depending on the currency, set the correct merchant account.
+  $merchant_account_id = commerce_braintree_get_merchant_account_id($payment_method, $balance['currency_code']);
 
   if (empty($payment_method['settings']['cardonfile']) || $context === NULL || $context == 'new') {
     // Build the credit card form first.
@@ -166,6 +191,7 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
       'transaction' => array(
         'type' => Braintree_Transaction::SALE,
         'amount' => $amount,
+        'merchantAccountId' => $merchant_account_id,
         'customer' => array(
           'firstName' => $first_name,
           'lastName' => $last_name,
@@ -740,4 +766,12 @@ function commerce_braintree_initialize($payment_method) {
 function commerce_braintree_price_amount($amount, $currency_code) {
   $rounded_amount = commerce_currency_round($amount, commerce_currency_load($currency_code));
   return number_format(commerce_currency_amount_to_decimal($rounded_amount, $currency_code), 2, '.', '');
+}
+
+/**
+ * Gets the merchant account id from the payment method settings for a currency.
+ */
+function commerce_braintree_get_merchant_account_id($payment_method, $currency_code) {
+  // Depending on the currency, set the correct merchant account.
+  return isset($payment_method['settings']['merchant_account_id'][$currency_code]) ? $payment_method['settings']['merchant_account_id'][$currency_code] : NULL;
 }

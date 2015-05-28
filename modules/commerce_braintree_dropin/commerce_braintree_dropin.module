@@ -127,8 +127,11 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
 
   $charge = commerce_payment_order_balance($order);
 
+  $merchant_account_id = commerce_braintree_get_merchant_account_id($payment_method, $charge['currency_code']);
+
   $sale_data = array(
     'amount' => commerce_braintree_price_amount($charge['amount'], $charge['currency_code']),
+    'merchantAccountId' => $merchant_account_id,
     'paymentMethodNonce' => $nonce,
     'customer' => array(
       'firstName' => $first_name,
