@@ -122,10 +122,6 @@ function commerce_braintree_tr_settings_form($settings = array()) {
   // Merge default settings into the stored settings array.
   $settings = (array) $settings + commerce_braintree_tr_default_settings();
 
-  // Get a list of enabled currencies
-
-  $currencies = commerce_currencies(TRUE);
-
   $form['merchant_id'] = array(
     '#type' => 'textfield',
     '#title' => t('Merchant ID'),
@@ -148,18 +144,27 @@ function commerce_braintree_tr_settings_form($settings = array()) {
   // Braintree supports multiple currencies through the use of multiple merchant
   // accounts.
   // If there is more than one currency enabled, create forms for those too.
-  if (count($currencies) > 1) {
-    foreach ($currencies as $currency) {
-      $form['merchant_account_id'][$currency['code']] = array(
-        '#type' => 'textfield',
-        '#title' => t('Merchant account ' . $currency['code']),
-        '#description' => t('The merchant account for ' . $currency['code']),
-        '#size' => 30,
-        '#maxlength' => 128,
-        '#default_value' => isset($settings['merchant_account_id'][$currency['code']]) ? $settings['merchant_account_id'][$currency['code']] : NULL,
-        '#required' => FALSE,
-      );
-    }
+  // Get a list of enabled currencies
+  $currencies = commerce_currencies(TRUE);
+
+  $form['merchant_account_id'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Merchant account ID'),
+    '#description' => t('To find your Merchant account ID: log into the Control Panel of Braintree; navigate to Settings > Processing > Merchant Accounts. Read more information on <a href="@url" target="_blank">Braintree</a>.',
+      array('@url' => 'https://articles.braintreepayments.com/control-panel/important-gateway-credentials#merchant-account-id')),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  foreach ($currencies as $currency) {
+    $form['merchant_account_id'][$currency['code']] = array(
+      '#type' => 'textfield',
+      '#title' => t('Merchant account ID for @currency', array('@currency' => $currency['code'])),
+      '#size' => 30,
+      '#maxlength' => 128,
+      '#default_value' => isset($settings['merchant_account_id'][$currency['code']]) ? $settings['merchant_account_id'][$currency['code']] : NULL,
+      '#required' => TRUE,
+    );
   }
 
   $form['environment'] = array(
