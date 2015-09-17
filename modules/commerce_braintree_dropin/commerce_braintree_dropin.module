@@ -38,15 +38,52 @@ function commerce_braintree_dropin_settings_form($settings = array()) {
  * Implements hook_form_alter().
  */
 function commerce_braintree_dropin_form_alter(&$form, &$form_state, $form_id) {
-  // Use form alter to make sure the external javsacript is always loaded.
-  // Attaching in the payment method submit form isn't consistent.
-  if (strstr($form_id, 'commerce_checkout_form')) {
-    // Make sure the Drop-in javascript api is included.
-    $form['#attached']['js'][] = array(
-      'data' => 'https://js.braintreegateway.com/v2/braintree.js',
-      'type' => 'external',
-    );
+  // Check to see if this is a checkout form and there is payment form element.
+  if (strstr($form_id, 'commerce_checkout_form')
+      && !empty($form['commerce_payment'])
+      && !empty($form_state['order']->payment_methods)) {
+
+    // Determine if Braintree Drop-in is available for this order.
+    $payment_methods = $form_state['order']->payment_methods;
+    foreach ($payment_methods as $payment_method) {
+      if ($payment_method['method_id'] == 'braintree_dropin') {
+        $drop_in = TRUE;
+      }
+    }
+
+    if (!empty($drop_in)) {
+      // Make sure the Drop-in javascript api is included
+      $form['#attached']['js'][] = array(
+        'data' => 'https://js.braintreegateway.com/v2/braintree.js',
+        'type' => 'external',
+      );
+
+      // When there is more than 1 payment method available, replace the
+      // ajax handler for the payment method selector so that the entire
+      // form is reloaded. Otherwise you cannot switch between different
+      // payment methods during checkout. This is because Braintree
+      // Drop-in hijacks the form event handlers.
+      if (count($payment_methods) > 1) {
+        $form['#prefix'] = '<div id="commerce-braintree-dropin-checkout-wrapper">';
+        $form['#suffix'] = '</div>';
+        $form['commerce_payment']['payment_method']['#ajax'] = array(
+          'callback' => 'commerce_braintree_dropin_checkout_ajax',
+          'wrapper' => 'commerce-braintree-dropin-checkout-wrapper',
+        );
+      }
+    }
   }
+}
+
+/**
+ * Override of commerce_payment_pane_checkout_form_details_refresh().
+ *
+ * Replaces the entire form so that Braintree Drop-in events can be
+ * added or removed properly when changing payment methods during
+ * checkout.
+ */
+function commerce_braintree_dropin_checkout_ajax(&$form, &$form_state) {
+  return $form;
 }
 
 /**
