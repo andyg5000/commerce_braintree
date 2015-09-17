@@ -398,7 +398,7 @@ function commerce_braintree_form_alter(&$form, &$form_state, $form_id) {
     // And it specifies a valid checkout page...
     if (commerce_checkout_page_load(substr($form_id, 23))) {
       // And the current page's form includes the payment checkout pane...
-      if (!empty($form['commerce_payment'])) {
+      if (!empty($form['commerce_payment']['payment_method'])) {
         // Check to see if the currently selected payment method is Card on File
         // enabled (via the cardonfile boolean in its settings array).
         $payment_method = commerce_payment_method_instance_load($form['commerce_payment']['payment_method']['#default_value']);
