@@ -19,7 +19,11 @@ libraries if you are not familiar with this process.
      a. zip: https://github.com/braintree/braintree_php/archive/3.5.0.zip
      b. tar.gz: https://github.com/braintree/braintree_php/archive/3.5.0.tar.gz
 
-  2. This module is tested to work with the 3.5.0 release. Other releases can be
+  2. Copy the library to your sites libraries folder and name it "braintree_php".
+     The path should be libraries/braintree_php/lib if you've extracted it
+     correctly.
+
+  3. This module is tested to work with the 3.5.0 release. Other releases can be
      viewed here: https://github.com/braintree/braintree_php/releases
 
 Download, install, and enable the Commerce Braintree module(s).
@@ -89,7 +93,7 @@ Add your Braintree account credentials for the enabled implementation(s).
 Testing
 =======
 
-To test your implemenation, add a product to your cart, proceed thorough checkout
+To test your implementation, add a product to your cart, proceed thorough checkout
 and enter a credit card. We recommend using a sandbox account for this before
 attempting to go live. If you're using a sandbox account, you can use the following
 credit card to test a transaction
