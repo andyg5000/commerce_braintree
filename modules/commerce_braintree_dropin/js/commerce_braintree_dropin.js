@@ -3,7 +3,7 @@
     attach: function(context, settings) {
       // Init Braintree Drop-in UI so that the form is insterted into the DOM.
       if ($('#commerce-braintree-dropin-container', context).length > 0 && Drupal.settings.commerceBraintreeDropinToken != undefined && braintree != undefined) {
-        $('#commerce-braintree-dropin-container', context).once('braintreeSetup', function() {
+        $('#commerce-braintree-dropin-container', context).once('commerce-braintree-dropin-setup', function() {
           braintree.setup(
           Drupal.settings.commerceBraintreeDropinToken,
           'dropin', {
