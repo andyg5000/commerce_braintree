@@ -35,6 +35,19 @@ function commerce_braintree_menu() {
     'file' => 'includes/commerce_braintree.admin.inc',
   );
 
+  // Add a menu item for refunding Braintree transactions.
+  $items['admin/commerce/orders/%commerce_order/payment/%commerce_payment_transaction/commerce-braintree-refund'] = array(
+    'title' => 'Refund',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_braintree_refund_form', 3, 5),
+    'access callback' => 'commerce_braintree_refund_access',
+    'access arguments' => array(3, 5),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_INLINE,
+    'weight' => 2,
+    'file' => 'includes/commerce_braintree.admin.inc',
+  );
+
   return $items;
 }
 
@@ -72,6 +85,22 @@ function commerce_braintree_void_access($order, $transaction) {
   // Return FALSE if it is more than 24 hours since the last update to the
   // transaction, as it will already have been settled.
   if (time() - $transaction->changed > 2600 * 24) {
+    return FALSE;
+  }
+
+  // Allow access if the user can update this transaction.
+  return commerce_payment_transaction_access('update', $transaction);
+}
+
+/**
+ * Access callback for refunding orders.
+ */
+function commerce_braintree_refund_access($order, $transaction) {
+  // Return FALSE if the transaction isn't for a Braintree method, doesn't have a
+  // success status or has an amount of 0 or less.
+  if (!in_array($transaction->payment_method, array('braintree', 'braintree_dropin'))
+     || $transaction->status != COMMERCE_PAYMENT_STATUS_SUCCESS
+     || $transaction->amount <= 0) {
     return FALSE;
   }
 

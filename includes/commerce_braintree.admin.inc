@@ -69,3 +69,106 @@ function commerce_braintree_void_form_submit($form, &$form_state) {
 
   $form_state['redirect'] = 'admin/commerce/orders/' . $form_state['order']->order_id . '/payment';
 }
+
+/**
+ * Form callback: allows the user to issue a refund on a prior transaction.
+ */
+function commerce_braintree_refund_form($form, &$form_state, $order, $transaction) {
+  $form_state['order'] = $order;
+  $form_state['transaction'] = $transaction;
+
+  // Load and store the payment method instance for this transaction.
+  $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+  $form_state['payment_method'] = $payment_method;
+
+  $default_amount = number_format(commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code), 2, '.', '');
+
+  $form['refund_description'] = array(
+    '#markup' => t('Refunding a transaction with return the refund amount to the customer\'s credit card.')
+      . '<br />' . t('You can refund any amount greater than 0 and less than or equal to the original transaction.'),
+  );
+
+  $form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Refund amount'),
+    '#description' => t('Enter the amount to be refunded back to the original credit card.'),
+    '#default_value' => $default_amount,
+    '#field_suffix' => check_plain($transaction->currency_code),
+    '#size' => 16,
+  );
+
+  $form = confirm_form($form,
+    t('What amount do you want to refund?'),
+    'admin/commerce/orders/' . $order->order_id . '/payment',
+    '',
+    t('Refund'),
+    t('Cancel'),
+    'confirm'
+  );
+
+  return $form;
+}
+
+/**
+ * Validate handler: check the refund amount before attempting refund request.
+ */
+function commerce_braintree_refund_form_validate($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $amount = $form_state['values']['amount'];
+
+  // Ensure a positive numeric amount has been entered for refund.
+  if (!is_numeric($amount) || $amount <= 0) {
+    form_set_error('amount', t('You must specify a positive numeric amount to refund.'));
+  }
+
+  // Ensure the amount is less than or equal to the captured amount.
+  if ($amount > commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code)) {
+    form_set_error('amount', t('You cannot refund more than the original transaction amount.'));
+  }
+}
+
+/**
+ * Submit handler: process a Braintree transaction refund.
+ */
+function commerce_braintree_refund_form_submit($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $amount = number_format($form_state['values']['amount'], 2, '.', '');
+  $order = $form_state['order'];
+  $payment_method = $form_state['payment_method'];
+
+  commerce_braintree_initialize($payment_method);
+
+  try {
+    $result = Braintree_Transaction::refund($transaction->remote_id, $amount);
+  }
+  catch (Exception $ex) {
+    $result = NULL;
+  }
+
+  // Inform the user if there were any issues processing the refund.
+  if (empty($result) || empty($result->success)) {
+    $message = !empty($result->_attributes['message']) ? $result->_attributes['message'] : t('No error provided from Braintree');
+    drupal_set_message(t('The payment transaction cannot be refunded at this time. @message', array('@message' => $message)), 'error');
+  }
+
+  // Inform the user of a successful void and update the payment transaction.
+  if (!empty($result) && !empty($result->success)) {
+    $refund_amount = commerce_currency_decimal_to_amount($amount, $transaction->currency_code);
+    drupal_set_message(t('Refund for @amount issued successfully', array('@amount' => commerce_currency_format($refund_amount, $transaction->currency_code))));
+
+    // Create a new transaction to record the refund.
+    $refund_transaction = commerce_payment_transaction_new($transaction->payment_method, $order->order_id);
+    $refund_transaction->instance_id = $payment_method['instance_id'];
+    $refund_transaction->remote_id = $result->transaction->_attributes['id'];
+    $refund_transaction->amount = $refund_amount * -1;
+    $refund_transaction->currency_code = $transaction->currency_code;
+    $refund_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+    $refund_transaction->remote_status = $result->transaction->_attributes['status'];
+    $refund_transaction->message = t('Credited to @remote_id.', array('@remote_id' => $transaction->remote_id));
+
+    // Save the refund transaction.
+    commerce_payment_transaction_save($refund_transaction);
+  }
+
+  $form_state['redirect'] = 'admin/commerce/orders/' . $order->order_id . '/payment';
+}
