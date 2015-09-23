@@ -5,6 +5,72 @@
  */
 
 /**
+ * Form callback: allows the user to submit a transaction for settlement.
+ */
+function commerce_braintree_settle_form($form, &$form_state, $order, $transaction) {
+  $form_state['order'] = $order;
+  $form_state['transaction'] = $transaction;.
+
+  // Load and store the payment method instance for this transaction.
+  $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+  $form_state['payment_method'] = $payment_method;
+
+  $amount = commerce_currency_format($transaction->amount, $transaction->currency_code);
+  $message =  t('Submit the @amount transaction "@remote_id" for settlement?', array('@remote_id' => $transaction->remote_id, '@amount' => $amount));
+
+  $form['markup'] = array(
+    '#markup' => $message,
+  );
+
+  $form = confirm_form($form,
+    $message,
+    'admin/commerce/orders/' . $order->order_id . '/payment',
+    '',
+    t('Settle'),
+    t('Cancel'),
+    'confirm'
+  );
+
+  return $form;
+}
+
+/**
+ * Submit handler: submit the transaction for settlement.
+ */
+function commerce_braintree_settle_form_submit($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+  commerce_braintree_initialize($payment_method);
+
+  // Attempt to invoke the Braintree API and process a transaction settlement.
+  try {
+    $result = Braintree_Transaction::submitForSettlement($transaction->remote_id);
+  }
+  catch (Exception $ex) {
+    $result = NULL;
+  }
+
+  // Inform the user if there were any issues submitting the settlement.
+  if (empty($result) || empty($result->success)) {
+    $message = !empty($result->_attributes['message']) ? $result->_attributes['message'] : t('No error provided from Braintree');
+    drupal_set_message(t('The payment transaction could not be submitted for settlement. @message', array('@message' => $message)), 'error');
+  }
+
+  // Inform the user of a successful submission for settlement and update the payment transaction.
+  if (!empty($result) && !empty($result->success)) {
+    drupal_set_message(t('Transaction submitted for settlement successfully.'));
+
+    // Update the payment transaction values to show the void.
+    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+    $transaction->remote_status = $result->transaction->_attributes['status'];
+    $transaction->message .= '<br />' . t('Submitted for settlement: @date', array('@date' => format_date(REQUEST_TIME, 'short')));
+    commerce_payment_transaction_save($transaction);
+  }
+
+  $form_state['redirect'] = 'admin/commerce/orders/' . $form_state['order']->order_id . '/payment';
+}
+
+/**
  * Form callback: allows the user to void a transaction.
  */
 function commerce_braintree_void_form($form, &$form_state, $order, $transaction) {

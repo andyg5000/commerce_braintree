@@ -145,6 +145,15 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
 
   $merchant_account_id = commerce_braintree_get_merchant_account_id($payment_method, $charge['currency_code']);
 
+  // Determine if we should settle the transaction immediately.
+  if (isset($payment_method['settings']['submit_for_settlement'])) {
+    $submit_for_settlement = (bool) $payment_method['settings']['submit_for_settlement'];
+  }
+  else {
+    // Default to TRUE if this setting hasn't been explicitly set by the store admin.
+    $submit_for_settlement = TRUE;
+  }
+
   $sale_data = array(
     'amount' => commerce_braintree_price_amount($charge['amount'], $charge['currency_code']),
     'merchantAccountId' => $merchant_account_id,
@@ -164,7 +173,7 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
     ),
     'options' => array(
       'storeInVault' => !empty($pane_values['cardonfile']) ? TRUE : FALSE,
-      'submitForSettlement' => TRUE,
+      'submitForSettlement' => $submit_for_settlement,
     ),
   );
 
@@ -178,7 +187,7 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
   $transaction = commerce_braintree_dropin_process_transaction($order, $payment_method, $charge, $response);
 
   // Set a form error if the payment transaction failed for any reason.
-  if (empty($transaction->status) || $transaction->status != COMMERCE_PAYMENT_STATUS_SUCCESS) {
+  if (empty($transaction->status) || !in_array($transaction->status, array(COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING))) {
     form_set_error('braintree_dropin', t('Your payment transaction could not be processed at this time. If an error was provided it was: @response', array('@response' => $transaction->message)));
     return FALSE;
   }
@@ -251,14 +260,16 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $order)
  * Save a commerce_payment_transaction object from the drop-in response.
  */
 function commerce_braintree_dropin_process_transaction($order, $payment_method, $charge, $response) {
+  // Determine the payment transaction internal status from the response status.
+  $remote_status = !empty($response->transaction->_attributes['status']) ? $response->transaction->_attributes['status'] : NULL;
   $transaction = commerce_payment_transaction_new('braintree_dropin', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->remote_id = !empty($response->transaction->_attributes['id']) ? $response->transaction->_attributes['id'] : NULL;
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $charge['currency_code'];
   $transaction->payload[REQUEST_TIME] = $response;
-  $transaction->status = (!empty($response->success) && $response->success == TRUE) ? COMMERCE_PAYMENT_STATUS_SUCCESS : COMMERCE_PAYMENT_STATUS_FAILURE;
-  $transaction->remote_status = !empty($response->transaction->_attributes['status']) ? $response->transaction->_attributes['status'] : NULL;
+  $transaction->status = commerce_braintree_transaction_status($remote_status);
+  $transaction->remote_status = $remote_status;
   $transaction->message = !empty($response->_attributes['message']) ? $response->_attributes['message'] : NULL;
   commerce_payment_transaction_save($transaction);
   return $transaction;
