@@ -301,9 +301,13 @@ function commerce_braintree_dropin_process_transaction($order, $payment_method, 
  */
 function commerce_braintree_dropin_create_cardonfile($order, $payment_method, $response) {
   $attributes = !empty($response->transaction->_attributes) ? $response->transaction->_attributes : array();
-  if (empty($attributes['creditCard']['token'])) {
+
+  // Do not attempt to save a card on file if there was no token returned or
+  // the order owner is anonymous.
+  if (empty($attributes['creditCard']['token']) || empty($order->uid)) {
     return FALSE;
   }
+
   $token = $attributes['creditCard']['token'];
 
   // Attempt to load an existing card on file with the same token before
