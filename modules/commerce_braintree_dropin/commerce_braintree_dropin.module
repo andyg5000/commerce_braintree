@@ -281,13 +281,18 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $order)
  * Save a commerce_payment_transaction object from the drop-in response.
  */
 function commerce_braintree_dropin_process_transaction($order, $payment_method, $charge, $response) {
+  // Determine the charge amount from the response object.
+  $amount = $response->transaction->_attributes['amount'];
+  $currency_code = $response->transaction->_attributes['currencyIsoCode'];
+  $amount_converted = commerce_currency_decimal_to_amount($amount, $currency_code);
+
   // Determine the payment transaction internal status from the response status.
   $remote_status = !empty($response->transaction->_attributes['status']) ? $response->transaction->_attributes['status'] : NULL;
   $transaction = commerce_payment_transaction_new('braintree_dropin', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->remote_id = !empty($response->transaction->_attributes['id']) ? $response->transaction->_attributes['id'] : NULL;
-  $transaction->amount = $charge['amount'];
-  $transaction->currency_code = $charge['currency_code'];
+  $transaction->amount = $amount_converted;
+  $transaction->currency_code = $currency_code;
   $transaction->payload[REQUEST_TIME] = $response;
   $transaction->status = commerce_braintree_transaction_status($remote_status);
   $transaction->remote_status = $remote_status;
