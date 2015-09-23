@@ -112,7 +112,7 @@ function commerce_braintree_void_access($order, $transaction) {
   // Make sure we're referencing a valid Braintree payment transaction.
   if (!in_array($transaction->payment_method, array('braintree_tr', 'braintree_dropin'))
      || empty($transaction->remote_id)
-     || !in_array($transaction->remote_status, array('submitted_for_settlement'))) {
+     || !in_array($transaction->remote_status, array('submitted_for_settlement', 'authorized', 'authorizing'))) {
     return FALSE;
   }
 
