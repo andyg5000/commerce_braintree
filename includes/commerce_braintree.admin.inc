@@ -9,7 +9,7 @@
  */
 function commerce_braintree_settle_form($form, &$form_state, $order, $transaction) {
   $form_state['order'] = $order;
-  $form_state['transaction'] = $transaction;.
+  $form_state['transaction'] = $transaction;
 
   // Load and store the payment method instance for this transaction.
   $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
