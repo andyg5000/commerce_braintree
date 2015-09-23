@@ -90,6 +90,22 @@ function commerce_braintree_dropin_form_commerce_payment_order_transaction_add_f
   // Include the Braintree Drop-in UI when it is selected as the payment method.
   if (!empty($form['payment_terminal']) && $form_state['payment_method']['method_id'] == 'braintree_dropin') {
     $form['payment_terminal']['payment_details'] += (array) commerce_braintree_dropin_submit_form_elements($form_state['payment_method'], $form_state['order']);
+
+    // Determine the default submit for settlement option for this payment method.
+    if (isset($form_state['payment_method']['settings']['submit_for_settlement'])) {
+      $submit_for_settlement = (bool) $form_state['payment_method']['settings']['submit_for_settlement'];
+    }
+    else {
+      $submit_for_settlement = TRUE;
+    }
+
+    // Add the ability to submit for settlement or just authorize the transaction.
+    $form['payment_terminal']['payment_details']['submit_for_settlement'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Submit the transaction for settlement?'),
+      '#default_value' => $submit_for_settlement,
+      '#description' => t('If unchecked the payment will have to be settled manually at a later date.'),
+    );
   }
 }
 
@@ -146,7 +162,12 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
   $merchant_account_id = commerce_braintree_get_merchant_account_id($payment_method, $charge['currency_code']);
 
   // Determine if we should settle the transaction immediately.
-  if (isset($payment_method['settings']['submit_for_settlement'])) {
+  if (isset($pane_values['submit_for_settlement'])) {
+    // Allows the admin payment transaction terminal to override the default.
+    $submit_for_settlement = $pane_values['submit_for_settlement'];
+  }
+  else if (isset($payment_method['settings']['submit_for_settlement'])) {
+    // Use the payment method settings.
     $submit_for_settlement = (bool) $payment_method['settings']['submit_for_settlement'];
   }
   else {
