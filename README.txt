@@ -16,15 +16,17 @@ See https://www.drupal.org/node/1440066 for more information on where to install
 libraries if you are not familiar with this process.
 
   1. Download the braintree_php library.
-     a. zip: https://github.com/braintree/braintree_php/archive/3.5.0.zip
-     b. tar.gz: https://github.com/braintree/braintree_php/archive/3.5.0.tar.gz
+     a. zip: https://github.com/braintree/braintree_php/archive/2.40.0.zip
+     b. tar.gz: https://github.com/braintree/braintree_php/archive/2.40.0.tar.gz
 
   2. Copy the library to your sites libraries folder and name it "braintree_php".
      The path should be libraries/braintree_php/lib if you've extracted it
      correctly.
 
-  3. This module is tested to work with the 3.5.0 release. Other releases can be
-     viewed here: https://github.com/braintree/braintree_php/releases
+  3. This module is tested to work with the 2.40.0 release. We're not using 3.x
+     because PHP 5.2 and 5.3 were deprecated in the 3.x release and Drupal 7
+     sites may be versions down to 5.2.5 Other releases can be viewed here:
+     https://github.com/braintree/braintree_php/releases
 
 Download, install, and enable the Commerce Braintree module(s).
 
