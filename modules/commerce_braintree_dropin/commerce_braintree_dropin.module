@@ -234,6 +234,7 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
  */
 function commerce_braintree_dropin_submit_form_elements($payment_method, $order) {
   $form = array();
+  $arguments = array();
 
   // Attempt to load the user object from the order data.
   if (!empty($order->uid)) {
