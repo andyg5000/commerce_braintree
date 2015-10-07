@@ -16,14 +16,25 @@ function commerce_braintree_settle_form($form, &$form_state, $order, $transactio
   $form_state['payment_method'] = $payment_method;
 
   $amount = commerce_currency_format($transaction->amount, $transaction->currency_code);
-  $message =  t('Submit the @amount transaction "@remote_id" for settlement?', array('@remote_id' => $transaction->remote_id, '@amount' => $amount));
 
-  $form['markup'] = array(
-    '#markup' => $message,
+  $default_amount = number_format(commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code), 2, '.', '');
+
+  $form['settlement_message'] = array(
+    '#markup' => t('Settling all or part of a transaction will finalize the charge on the customer\'s payment method.')
+      . '<br /><strong>' . t('Notice: You can only settle a transaction one time.') . '</strong>' ,
+  );
+
+  $form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Settlement amount'),
+    '#description' => t('Enter the amount to settle for this transaction.'),
+    '#default_value' => $default_amount,
+    '#field_suffix' => check_plain($transaction->currency_code),
+    '#size' => 16,
   );
 
   $form = confirm_form($form,
-    $message,
+    t('Settle the payment transaction?'),
     'admin/commerce/orders/' . $order->order_id . '/payment',
     '',
     t('Settle'),
@@ -35,16 +46,35 @@ function commerce_braintree_settle_form($form, &$form_state, $order, $transactio
 }
 
 /**
+ * Validate handler: validate the settlement values.
+ */
+function commerce_braintree_settle_form_validate($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $amount = $form_state['values']['amount'];
+
+  // Ensure a positive numeric amount has been entered for settlement.
+  if (!is_numeric($amount) || $amount <= 0) {
+    form_set_error('amount', t('You must specify a positive numeric amount to settle.'));
+  }
+
+  // Ensure the amount is less than or equal to the captured amount.
+  if ($amount > commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code)) {
+    form_set_error('amount', t('You cannot settle more than the original transaction amount.'));
+  }
+}
+
+/**
  * Submit handler: submit the transaction for settlement.
  */
 function commerce_braintree_settle_form_submit($form, &$form_state) {
   $transaction = $form_state['transaction'];
+  $amount = $form_state['values']['amount'];
   $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
   commerce_braintree_initialize($payment_method);
 
   // Attempt to invoke the Braintree API and process a transaction settlement.
   try {
-    $result = Braintree_Transaction::submitForSettlement($transaction->remote_id);
+    $result = Braintree_Transaction::submitForSettlement($transaction->remote_id, $amount);
   }
   catch (Exception $ex) {
     $result = NULL;
@@ -59,11 +89,11 @@ function commerce_braintree_settle_form_submit($form, &$form_state) {
   // Inform the user of a successful submission for settlement and update the payment transaction.
   if (!empty($result) && !empty($result->success)) {
     drupal_set_message(t('Transaction submitted for settlement successfully.'));
-
-    // Update the payment transaction values to show the void.
+    // Update the payment transaction values to show the settlement.
     $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
     $transaction->remote_status = $result->transaction->_attributes['status'];
     $transaction->message .= '<br />' . t('Submitted for settlement: @date', array('@date' => format_date(REQUEST_TIME, 'short')));
+    $transaction->amount = commerce_currency_decimal_to_amount($result->transaction->_attributes['amount'], $result->transaction->_attributes['currencyIsoCode']);
     commerce_payment_transaction_save($transaction);
   }
 
