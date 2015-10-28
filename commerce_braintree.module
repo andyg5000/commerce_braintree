@@ -874,6 +874,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
       $commerce_transaction->remote_status = $transaction->status;
       // Commerce don't store amount in decimal, convert it.
       $commerce_transaction->amount = commerce_currency_decimal_to_amount($transaction->amount, $transaction->currencyIsoCode);
+      $commerce_transaction->currency_code  = $transaction->currencyIsoCode;
       $commerce_transaction->status = commerce_braintree_transaction_status($transaction->status);
       commerce_payment_transaction_save($commerce_transaction);
       // Transaction succeded. Go to next pane.
