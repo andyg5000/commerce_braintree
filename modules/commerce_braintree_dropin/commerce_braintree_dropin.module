@@ -209,7 +209,11 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
 
   // Set a form error if the payment transaction failed for any reason.
   if (empty($transaction->status) || !in_array($transaction->status, array(COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING))) {
-    form_set_error('braintree_dropin', t('Your payment transaction could not be processed at this time. If an error was provided it was: @response', array('@response' => $transaction->message)));
+    $error = t('Your payment transaction could not be processed at this time. If an error was provided it was: @response', array('@response' => $transaction->message));
+
+    // Allow other modules to customize the error that's displayed ot customers.
+    drupal_alter('commerce_braintree_transaction_error', $error, $transaction, $response);
+    form_set_error('braintree_dropin', $error);
     return FALSE;
   }
 

@@ -854,13 +854,16 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
     $message .= $processorResponseText;
   }
   else {
-    $message = $result->message;
-    drupal_set_message(t('There was an error: %error.', array('%error' => $result->message)), 'error');
+    $error = t('There was an error: %error.', array('%error' => $result->message));
+
+    // Allow other modules to alter the error message displayed to customers.
+    drupal_alter('commerce_braintree_transaction_error', $error, $commerce_transaction, $result);
+    drupal_set_message($error, 'error');
   }
 
   // Prepare the data to be recorded in Commerce.
   $commerce_transaction->instance_id = $payment_method['instance_id'];
-  $commerce_transaction->message = $message;
+  $commerce_transaction->message = $result->message;
 
   if ($redirect) {
     if (!$result->success) {
