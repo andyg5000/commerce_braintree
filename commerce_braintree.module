@@ -116,9 +116,9 @@ function commerce_braintree_void_access($order, $transaction) {
     return FALSE;
   }
 
-  // Return FALSE if it is more than 24 hours since the last update to the
-  // transaction, as it will already have been settled.
-  if (time() - $transaction->changed > 2600 * 24) {
+  // Settled transactions cannot be voided. Assume all transactions that are complete
+  // and 24 hours old have been settled.
+  if (time() - $transaction->changed > 2600 * 24 && $transaction->status == COMMERCE_PAYMENT_STATUS_SUCCESS) {
     return FALSE;
   }
 
