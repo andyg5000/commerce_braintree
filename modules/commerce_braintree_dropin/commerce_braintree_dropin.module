@@ -244,9 +244,6 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $order)
   if (!empty($order->uid)) {
     $user = user_load($order->uid);
   }
-  else {
-    global $user;
-  }
 
   // Setting the customer id loads Braintree vault saved payment methods.
   if (!empty($user->uid) && !empty($user->data['braintree_vault'])) {
