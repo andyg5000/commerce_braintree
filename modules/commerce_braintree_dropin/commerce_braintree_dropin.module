@@ -270,10 +270,20 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $order)
 
   // Add option to save card on file for authenticated users.
   if (!empty($payment_method['settings']['cardonfile']) && !empty($user->uid)) {
-    $form['cardonfile'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Securely save this payment method for next time.'),
-    );
+    $storage = variable_get('commerce_cardonfile_storage', 'opt-in');
+    if ($storage !== 'required') {
+      $form['cardonfile'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Securely save this payment method for next time.'),
+        '#default_value' => $storage == 'opt-in' ? FALSE : TRUE,
+      );
+    }
+    else {
+      $form['cardonfile'] = array(
+        '#type' => 'value',
+        '#value' => TRUE,
+      );
+    }
   }
 
   return $form;
