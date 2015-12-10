@@ -847,13 +847,9 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
   else {
     $commerce_transaction = commerce_payment_transaction_load($transaction_id);
   }
-  $message = NULL;
-  if ($result->success) {
-    $processorResponseCode = $result->transaction->processorResponseCode;
-    $processorResponseText = $result->transaction->processorResponseText;
-    $message .= $processorResponseText;
-  }
-  else {
+
+  // Show any errors to the customer if the transaction failed.
+  if (empty($result->success)) {
     $error = t('There was an error: %error.', array('%error' => $result->message));
 
     // Allow other modules to alter the error message displayed to customers.
@@ -863,7 +859,7 @@ function _commerce_braintree_default_process_transaction($result, $order, $payme
 
   // Prepare the data to be recorded in Commerce.
   $commerce_transaction->instance_id = $payment_method['instance_id'];
-  $commerce_transaction->message = $result->message;
+  $commerce_transaction->message = commerce_braintree_build_payment_transaction_message($result);
 
   if ($redirect) {
     if (!$result->success) {
@@ -953,4 +949,43 @@ function commerce_braintree_transaction_status($remote_status) {
   }
 
   return $status;
+}
+
+/**
+ * Builds the message that's stored with the payment transaction.
+ *
+ * @param $response object
+ *   Braintree API response object.
+ *
+ * @return string
+ */
+function commerce_braintree_build_payment_transaction_message($response) {
+  $message = array();
+
+  // Append the braintree response to the message.
+  if (!empty($response->message)) {
+    $message[] = $response->message;
+  }
+
+  // Append the processors response to the message.
+  if (!empty($response->transaction->processorResponseText)) {
+    $message[] = t('Processor response: @response', array('@response' =>$response->transaction->processorResponseText));
+  }
+
+  // Append credit card information to the message.
+  if (!empty($response->transaction->creditCard)) {
+    $message[] = t('Credit card type: @type', array('@type' => $response->transaction->creditCard['cardType']));
+    $message[] = t('Credit card last 4: @lastfour', array('@lastfour' => $response->transaction->creditCard['last4']));
+  }
+
+  // Append the gateway rejection reaseon to the response.
+  if (!empty($response->transaction->gatewayRejectionReason)) {
+    $message[] = t('Gateway reject reason: @response', array('@response' => $response->transaction->gatewayRejectionReason));
+  }
+
+  $message = implode('<br />', $message);
+
+  drupal_alter('commerce_braintree_build_transaction_message', $message, $response);
+
+  return $message;
 }

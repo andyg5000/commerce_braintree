@@ -209,7 +209,7 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
 
   // Set a form error if the payment transaction failed for any reason.
   if (empty($transaction->status) || !in_array($transaction->status, array(COMMERCE_PAYMENT_STATUS_SUCCESS, COMMERCE_PAYMENT_STATUS_PENDING))) {
-    $error = t('Your payment transaction could not be processed at this time. If an error was provided it was: @response', array('@response' => $transaction->message));
+    $error = t('Your payment transaction could not be processed at this time. If an error was provided it was: @response', array('@response' => $response->message));
 
     // Allow other modules to customize the error that's displayed ot customers.
     drupal_alter('commerce_braintree_transaction_error', $error, $transaction, $response);
@@ -308,7 +308,7 @@ function commerce_braintree_dropin_process_transaction($order, $payment_method, 
   $transaction->payload[REQUEST_TIME] = $response;
   $transaction->status = commerce_braintree_transaction_status($remote_status);
   $transaction->remote_status = $remote_status;
-  $transaction->message = !empty($response->_attributes['message']) ? $response->_attributes['message'] : NULL;
+  $transaction->message = commerce_braintree_build_payment_transaction_message($response);
   commerce_payment_transaction_save($transaction);
   return $transaction;
 }
