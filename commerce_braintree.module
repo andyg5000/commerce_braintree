@@ -334,6 +334,7 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
       'transaction' => array(
         'type' => Braintree_Transaction::SALE,
         'amount' => $amount,
+        'orderId' => $order->order_id,
         'merchantAccountId' => $merchant_account_id,
         'customer' => array(
           'firstName' => $first_name,
@@ -365,6 +366,7 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
       // Add transaction related data.
       'transaction' => array(
         'type' => Braintree_Transaction::SALE,
+        'orderId' => $order->order_id,
         'amount' => $amount,
         'paymentMethodToken' => $card->remote_id,
         'options' => array(

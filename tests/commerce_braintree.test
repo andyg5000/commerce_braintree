@@ -86,6 +86,7 @@ class CommerceBraintreeTest extends CommerceBaseTestCase {
         'transaction' => array(
           'type' => Braintree_Transaction::SALE,
           'amount' => $this->price,
+          'orderId' => $order->order_id,
           'customer' => array(
             'firstName' => 'Test User',
             'email' => 'test@exemple.com',

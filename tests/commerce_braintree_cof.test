@@ -91,6 +91,7 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
         'transaction' => array(
           'type' => Braintree_Transaction::SALE,
           'amount' => $this->price,
+          'orderId' => $order->order_id,
           'customer' => array(
             'firstName' => 'Test User',
             'email' => 'test@exemple.com',
@@ -162,6 +163,7 @@ class CommerceBraintreeCofTest extends CommerceBaseTestCase {
         'transaction' => array(
           'type' => Braintree_Transaction::SALE,
           'amount' => '42',
+          'orderId' => $this->order->order_id,
           'paymentMethodToken' => $remote_id,
         ),
         'redirectUrl' => url('checkout/' . $this->order->order_id . '/payment/return/', array('absolute' => TRUE))
