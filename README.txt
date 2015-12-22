@@ -75,7 +75,7 @@ Add your Braintree account credentials for the enabled implementation(s).
   4. Click edit for either the "Braintree Drop-in UI" or "Braintree Transparent
      Redirect" payment rule. Note: We do not recommend using both at the same time.
 
-  5. Fill out the settings for the implementation you whish to enable.
+  5. Fill out the settings for the implementation you wish to enable.
 
      a. Enter your payment settings using the API credentials gathered above
      b. Select "Sandbox" server if you've registered using a sandbox account
