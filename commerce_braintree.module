@@ -813,8 +813,7 @@ function _commerce_braintree_get_transaction_informations($order) {
   $locality = $wrapper->commerce_customer_billing->commerce_customer_address->locality->value();
   $postal_code = $wrapper->commerce_customer_billing->commerce_customer_address->postal_code->value();
   $administrative_area = $wrapper->commerce_customer_billing->commerce_customer_address->administrative_area->value();
-  $wrapper2 = entity_metadata_wrapper('user', $order->uid);
-  $customer_mail = $wrapper2->mail->value();
+  $customer_mail = $wrapper->mail->value();
   return array(
     $amount,
     $customer_name,
