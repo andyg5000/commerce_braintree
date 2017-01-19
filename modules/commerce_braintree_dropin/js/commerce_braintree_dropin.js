@@ -7,26 +7,19 @@
           braintree.setup(
           Drupal.settings.commerceBraintreeDropinToken,
           'dropin', {
-            container: 'commerce-braintree-dropin-container'
+            container: 'commerce-braintree-dropin-container',
+            onError: function(payload) {
+              // Show the primary submitButton button and remove the duplicate one
+              $('.checkout-continue').each(function() {
+                if ($(this).attr('disabled') == true || $(this).attr('disabled') == 'disabled') {
+                  $(this).remove();
+                }
+                $(this).show();
+              });
+            }
           });
         });
       }
-
-      // Form validation and the Braintree JS api prevent submitting the form
-      // multiple times. We need to remove the "undo" the event handler that
-      // commerce_checkout.js has added to the submit button.
-      var submitButton = $('.checkout-continue', context);
-      submitButton.click(function() {
-        setTimeout(function() {
-          // Show the primary submitButton button and hide the duplicate one.
-          submitButton.show();
-          $('.checkout-continue').each(function() {
-            if ($(this).attr('disabled') == true || $(this).attr('disabled') == 'disabled') {
-              $(this).remove();
-            }
-          })
-        }, 1);
-      });
 
       // Braintree hijacks all submit buttons for this form. Simulate the back
       // button to make sure back submit still works.
