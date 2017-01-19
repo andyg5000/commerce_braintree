@@ -15,6 +15,7 @@
                   $(this).remove();
                 }
                 $(this).show();
+                $('.checkout-processing').hide();
               });
             }
           });
