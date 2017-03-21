@@ -343,7 +343,7 @@ function commerce_braintree_dropin_create_cardonfile($order, $payment_method, $r
   }
 
   // Populate all of the cardonfile properties from the response object.
-  $cardonfile->card_name = $attributes['creditCard']['firstName'] . ' ' . $attributes['creditCard']['lastName'];
+  $cardonfile->card_name = $attributes['customer']['firstName'] . ' ' . $attributes['customer']['lastName'];
   $cardonfile->card_type = $attributes['creditCard']['cardType'];
   $cardonfile->card_exp_month = $attributes['creditCard']['expirationMonth'];
   $cardonfile->card_exp_year = $attributes['creditCard']['expirationYear'];
