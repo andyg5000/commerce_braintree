@@ -159,7 +159,7 @@ function commerce_braintree_update_card() {
     $expirationYear = $result->creditCard->_attributes['expirationYear'];
     $last4 = $result->creditCard->_attributes['last4'];
 
-    $cards = commerce_cardonfile_load_multiple_by_remote_id($token);
+    $cards = commerce_cardonfile_load_multiple(FALSE, array('remote_id' => $token));
     $card_stored = reset($cards);
     $card_stored->card_name = $cardholderName;
     $card_stored->card_exp_month = $expirationMonth;
