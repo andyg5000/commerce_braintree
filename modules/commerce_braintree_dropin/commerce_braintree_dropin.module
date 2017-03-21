@@ -19,6 +19,9 @@ function commerce_braintree_dropin_commerce_payment_method_info() {
     'description' => t('Integrates with Braintree Drop-in for secure on-site credit card payment.'),
     'terminal' => TRUE,
     'offsite' => FALSE,
+    'cardonfile' => array(
+      'delete callback' => 'commerce_braintree_dropin_cardonfile_pm_delete',
+    ),
   );
 
   return $payment_methods;
@@ -27,7 +30,7 @@ function commerce_braintree_dropin_commerce_payment_method_info() {
 /**
  * Payment method callback: Braintree Drop-in UI settings form.
  *
- * @see CALLBACK_commerce_payment_method_settings_form().
+ * @see CALLBACK_commerce_payment_method_settings_form()
  */
 function commerce_braintree_dropin_settings_form($settings = array()) {
   // Reuse the transparent redirect settings form.
@@ -52,7 +55,7 @@ function commerce_braintree_dropin_form_alter(&$form, &$form_state, $form_id) {
     }
 
     if (!empty($drop_in)) {
-      // Make sure the Drop-in javascript api is included
+      // Make sure the Drop-in javascript api is included.
       $form['#attached']['js'][] = array(
         'data' => 'https://js.braintreegateway.com/v2/braintree.js',
         'type' => 'external',
@@ -151,7 +154,7 @@ function commerce_braintree_dropin_submit_form_validate($payment_method, $pane_f
 /**
  * Submit callback for the Braintree Drop-in payment method.
  *
- * @see CALLBACK_commerce_payment_method_submit_form_submit().
+ * @see CALLBACK_commerce_payment_method_submit_form_submit()
  */
 function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
   $nonce = commerce_braintree_dropin_get_nonce();
@@ -166,7 +169,7 @@ function commerce_braintree_dropin_submit_form_submit($payment_method, $pane_for
     // Allows the admin payment transaction terminal to override the default.
     $submit_for_settlement = $pane_values['submit_for_settlement'];
   }
-  else if (isset($payment_method['settings']['submit_for_settlement'])) {
+  elseif (isset($payment_method['settings']['submit_for_settlement'])) {
     // Use the payment method settings.
     $submit_for_settlement = (bool) $payment_method['settings']['submit_for_settlement'];
   }
@@ -358,6 +361,25 @@ function commerce_braintree_dropin_create_cardonfile($order, $payment_method, $r
   $user = user_load($order->uid);
   $user->data['braintree_vault'] = $attributes['customer'];
   user_save($user);
+}
+
+/**
+ * Delete a Braintree payment method based on the stored cardonfile token.
+ */
+function commerce_braintree_dropin_cardonfile_pm_delete($form, &$form_state, $payment_method, $card_data) {
+  commerce_braintree_initialize($payment_method);
+  // Delete card on file from the Braintree Vault.
+  $result = Braintree_PaymentMethod::delete($card_data->remote_id);
+
+  if ($result->success) {
+    watchdog('commerce_braintree_dropin', 'Braintree Vault cardonfile deletion succeeded for token: ', array($card_data->remote_id), WATCHDOG_INFO);
+    return TRUE;
+  }
+  else {
+    // Something went wrong, so log it.
+    watchdog('commerce_braintree', 'Braintree Vault card on file deletion failed !param', array('!param' => '<pre>' . check_plain(print_r($result, TRUE)) . '</pre>'), WATCHDOG_ERROR);
+    return FALSE;
+  }
 }
 
 /**
