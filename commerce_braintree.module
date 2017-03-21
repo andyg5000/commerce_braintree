@@ -712,8 +712,11 @@ function commerce_braintree_credit_card_form($payment_method) {
  */
 function commerce_braintree_get_feedback() {
   $feedback = FALSE;
-  if (isset($_SERVER['QUERY_STRING'])) {
-    $feedback = $_SERVER['QUERY_STRING'];
+  // drupal_get_query_parameters() excludes $_GET['q'].
+  $params = drupal_get_query_parameters();
+  if (!empty($params)) {
+    // Rebuild the query string from the array.
+    $feedback = drupal_http_build_query($params);
   }
   return $feedback;
 }
