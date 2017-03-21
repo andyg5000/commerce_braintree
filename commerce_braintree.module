@@ -332,6 +332,7 @@ function commerce_braintree_tr_redirect_form($form, &$form_state, $order, $payme
     $trData = Braintree_TransparentRedirect::transactionData(array(
       // Add transaction related data.
       'transaction' => array(
+        'channel' => 'CommerceGuys_BT_Vzero',
         'type' => Braintree_Transaction::SALE,
         'amount' => $amount,
         'orderId' => $order->order_id,
