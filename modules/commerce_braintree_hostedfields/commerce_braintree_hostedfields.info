@@ -1,0 +1,5 @@
+name = Braintree (Hosted Fields)
+description = Integrates Braintree Hosted Fields for on-site credit card payment.
+package = Commerce (contrib)
+core = 7.x
+dependencies[] = commerce_braintree
