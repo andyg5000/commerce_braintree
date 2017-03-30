@@ -227,8 +227,6 @@ function commerce_braintree_hostedfields_submit_form_elements($payment_method, $
     '#suffix' => '</div>',
   );
 
-  $form['braintree']['method_title']['#markup'] = t('Credit card details');
-
   $form['braintree']['number'] = array(
     '#type' => 'item',
     '#title' => t('Card number'),
