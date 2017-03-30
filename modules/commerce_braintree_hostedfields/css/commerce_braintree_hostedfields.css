@@ -1,57 +1,70 @@
-#edit-commerce-payment-payment-details-braintree-number {
-    width: 16em;
-    margin-top: 10px;
-    margin-right: 10px;
+/* Commerce Braintree Hosted Fields -- Default Styles */
+.braintree-form #edit-commerce-payment-payment-details-braintree-number,
+.braintree-form #edit-commerce-payment-payment-details-braintree-cvv {
+  width: auto;
 }
 
-#edit-commerce-payment-payment-details-braintree-cvv {
-    margin-top: 10px;
-    width: 82px;
+.braintree-form .form-item {
+  margin-bottom: .5rem;
 }
 
-#edit-commerce-payment-payment-details-braintree-expiration .form-type-item {
-    float: left;
-}
-#edit-commerce-payment-payment-details-braintree-expiration .commerce-month-year-divider {
-    display: block;
-    float: left;
-    margin: 1.5em 1em;
+.braintree-form #edit-commerce-payment-payment-details-braintree-expiration .form-type-item,
+.braintree-form #edit-payment-details-braintree-expiration .form-type-item,
+.braintree-form #edit-expiration .form-type-item {
+  padding: 0;
+  float: left;
 }
 
-.credit-card-form__expiration {
-    margin-top: 10px;
-    margin-right: 10px;
-    margin-bottom: 1em;
+.braintree-form .commerce-month-year-divider {
+  display: none;
+  float: left;
 }
 
 .braintree-hosted-field {
-    height: 1.2em;
-    border: 1px solid #D6D2C4;
-    padding: 4px;
-    background: #FFF;
-    box-sizing: content-box;
-}
-
-#expiration-month {
-    width: 3em;
-}
-
-#expiration-year {
-    width: 3em;
-}
-
-#cvv {
-    width: 5em;
+  height: 1.2em;
+  border: 1px solid #D6D2C4;
+  padding: 5px;
+  background: #FFF;
+  box-sizing: content-box;
+  width: auto;
 }
 
 .braintree-hosted-fields-focused {
-    border-color: #777;
+  border-color: #777;
 }
 
 .braintree-hosted-fields-invalid {
-    border-color: red;
+  border-color: red;
 }
 
 .braintree-hosted-fields-valid {
-    border-color: limegreen;
+  border-color: limegreen;
+}
+
+/* Commerce Braintree Hosted Fields -- Responsive Styles */
+@media only screen and (min-width: 768px) {
+  .braintree-form #edit-commerce-payment-payment-details-braintree-expiration,
+  .braintree-form #edit-payment-details-braintree-expiration,
+  .braintree-form #edit-expiration {
+    display: flex;
+  }
+  .braintree-form .commerce-month-year-divider {
+    display: block;
+    margin: auto 1rem .5rem 1rem;
+    width: .75rem;
+    text-align: center;
+    line-height: 1.2em;
+    height: 1.2em;
+    padding: 5px 0;
+  }
+
+  .braintree-form #card-number {
+    width: 16rem;
+  }
+
+  .braintree-form #expiration-month,
+  .braintree-form #expiration-year,
+  .braintree-form #cvv {
+    width: 6.25rem;
+  }
 }
