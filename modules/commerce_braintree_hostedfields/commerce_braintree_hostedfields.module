@@ -68,6 +68,7 @@ function commerce_braintree_hostedfields_default_settings() {
     'merchant_account_id' => '',
     'descriptor_name' => '',
     'environment' => 'sandbox',
+    'paypal_button' => FALSE,
     'advanced_fraud_detect' => FALSE,
     'cardonfile' => FALSE,
     'submit_for_settlement' => TRUE,
@@ -83,6 +84,19 @@ function commerce_braintree_hostedfields_settings_form($settings = array()) {
   $settings = $settings + commerce_braintree_hostedfields_default_settings();
   // Reuse the transparent redirect settings form.
   $form = commerce_braintree_settings_form($settings);
+
+  // Add option to enable the Braintree PayPal button.
+  $form['paypal_button'] = array(
+    '#type' => 'radios',
+    '#title' => t('Include PayPal Button'),
+    '#description' => t('Adds the ability to pay via PayPal. <strong>Must also be configured in the Braintree dashboard.</strong>'),
+    '#options' => array(
+      0 => t('No'),
+      1 => t('Yes'),
+    ),
+    '#default_value' => $settings['paypal_button'],
+  );
+
   $form['advanced_fraud_detect'] = array(
     '#type' => 'radios',
     '#title' => t('Enable Advanced Fraud Detection?'),
@@ -210,6 +224,11 @@ function commerce_braintree_hostedfields_submit_form_elements($payment_method, $
     ),
   );
 
+  // Add required settings for PayPal.
+  if (!empty($payment_method['settings']['paypal_button'])) {
+    $js_settings['paypal'] = array('container' => 'paypal-container');
+  }
+
   // Allow other modules to alter the JS settings.
   drupal_alter('commerce_braintree_hostedfields_js', $js_settings, $payment_method);
 
@@ -231,45 +250,69 @@ function commerce_braintree_hostedfields_submit_form_elements($payment_method, $
     '#type' => 'hidden',
   );
 
-  $form['braintree']['method_title'] = array(
-    '#prefix' => '<div class="payment-details-method-title">',
-    '#suffix' => '</div>',
+  $form['braintree']['cc'] = array(
+    '#type' => 'container',
   );
 
-  $form['braintree']['number'] = array(
+  $form['braintree']['cc']['method_wrapper'] = array(
+    '#prefix' => '<div class="payment-details-method-title">',
+    '#markup' => t('Pay with Credit Card'),
+    '#suffix' => '</div>',
+    '#access' => !empty($payment_method['settings']['paypal_button']),
+  );
+
+  $form['braintree']['cc']['number'] = array(
     '#type' => 'item',
     '#title' => t('Card number'),
     '#markup' => '<div id="card-number" class="braintree-hosted-field"></div>',
   );
 
-  $form['braintree']['expiration'] = array(
+  $form['braintree']['cc']['expiration'] = array(
     '#type' => 'container',
     '#attributes' => array(
       'class' => array('clearfix'),
     ),
   );
 
-  $form['braintree']['expiration']['month'] = array(
+  $form['braintree']['cc']['expiration']['month'] = array(
     '#type' => 'item',
     '#title' => t('Expiry Month'),
     '#markup' => '<div id="expiration-month" class="braintree-hosted-field"></div>',
   );
 
-  $form['braintree']['expiration']['divider'] = array(
+  $form['braintree']['cc']['expiration']['divider'] = array(
     '#markup' => '<span class="commerce-month-year-divider">/</span>',
   );
 
-  $form['braintree']['expiration']['year'] = array(
+  $form['braintree']['cc']['expiration']['year'] = array(
     '#type' => 'item',
     '#title' => t('Year'),
     '#markup' => '<div id="expiration-year" class="braintree-hosted-field"></div>',
   );
 
-  $form['braintree']['cvv'] = array(
+  $form['braintree']['cc']['cvv'] = array(
     '#type' => 'item',
     '#title' => t('CVV'),
     '#markup' => '<div id="cvv" class="braintree-hosted-field"></div>',
   );
+
+  // Add form elements required to add PayPal button.
+  if (!empty($payment_method['settings']['paypal_button'])) {
+    $form['braintree']['paypal'] = array(
+      '#type' => 'container',
+    );
+
+    $form['braintree']['paypal']['method_title'] = array(
+      '#prefix' => '<div class="paypal-method-title">',
+      '#markup' => t('Or pay with PayPal'),
+      '#suffix' => '</div>',
+    );
+
+    $form['braintree']['paypal']['button'] = array(
+      '#type' => 'item',
+      '#markup' => '<div id="paypal-container"></div>',
+    );
+  }
 
   // Add option to save card on file for authenticated users.
   if (!empty($payment_method['settings']['cardonfile']) && !empty($user->uid)) {
