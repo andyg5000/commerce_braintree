@@ -113,12 +113,11 @@
       onError: $.proxy(this.onError, this),
       id: this.fromId,
       hostedFields: {
-        styles: this.settings.hostedFields.styles,
         onFieldEvent: this.onFieldEvent
       }
     };
     // Set up hosted fields selector
-    options.hostedFields = $.extend(options.hostedFields, this.settings.hostedFields);
+    options = $.extend(options, this.settings);
 
     if (this.settings.advancedFraudTools === true) {
       options.dataCollector = {
