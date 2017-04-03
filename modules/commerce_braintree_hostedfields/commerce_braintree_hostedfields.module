@@ -66,6 +66,7 @@ function commerce_braintree_hostedfields_default_settings() {
     'public_key' => '',
     'private_key' => '',
     'merchant_account_id' => '',
+    'descriptor_name' => '',
     'environment' => 'sandbox',
     'advanced_fraud_detect' => FALSE,
     'cardonfile' => FALSE,
@@ -93,6 +94,12 @@ function commerce_braintree_hostedfields_settings_form($settings = array()) {
       1 => t('Yes'),
     ),
     '#default_value' => $settings['advanced_fraud_detect'],
+  );
+  $form['descriptor_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Unique Store Descriptor Name'),
+    '#description' => t('This soft identifier is used to know which store this transaction came from in the case that you are running multiple stores with the same braintree account. Company name/DBA section must be either 3, 7 or 12 characters and the product descriptor can be up to 18, 14, or 9 characters respectively (with an * in between for a total descriptor name of 22 characters).'),
+    '#default_value' => $settings['descriptor_name'],
   );
   return $form;
 }
@@ -153,6 +160,7 @@ function commerce_braintree_hostedfields_commerce_cardonfile_checkout_pane_form_
 
 /**
  * Helper method to strip a FAPI array of hosted fields.
+ *
  * @param $form
  * @param $form_state
  */
@@ -169,11 +177,12 @@ function commerce_braintree_hosted_fields_remove_hosted_fields_form(&$form, &$fo
  * Return the form elements for the hosted fields form.
  *
  * @param $payment_method
- *  The commerce payment method.
+ *   The commerce payment method.
  * @param array $arguments
- *  An optional array of arguments to pass to Braintree.
+ *   An optional array of arguments to pass to Braintree.
+ *
  * @return array
- *  An array of form elements.
+ *   An array of form elements.
  */
 function commerce_braintree_hostedfields_submit_form_elements($payment_method, $arguments = array()) {
   global $user;

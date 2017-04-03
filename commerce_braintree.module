@@ -876,6 +876,16 @@ function commerce_braintree_js_form_submit($payment_method, $pane_form, &$pane_v
     ),
   );
 
+  if (isset($payment_method['settings']['descriptor_name'])) {
+    $descriptor_name = $payment_method['settings']['descriptor_name'];
+    if (!empty($descriptor_name)) {
+      $sale_data['descriptor'] = array(
+        'name' => $descriptor_name,
+      );
+    }
+  }
+
+
   // Update the request if it was submitted with a card on file.
   if (!empty($pane_values['cardonfile']) && $pane_values['cardonfile'] != 'new') {
     $cardonfile = commerce_cardonfile_load($pane_values['cardonfile']);
