@@ -1251,7 +1251,8 @@ function commerce_braintree_js_cardonfile_form_submit(&$form, &$form_state) {
     }
     catch (Exception $ex) {
       watchdog('commerce_braintree', 'Unable to fetch Braintree customer account due to @error', array('@error' => $ex->getMessage()), WATCHDOG_ERROR);
-      return;
+      drupal_set_message(t('We are unable to create a payment profile for you at this time.'), 'error');
+      return FALSE;
     }
 
     // Create or determine the payment method that was selected
@@ -1263,7 +1264,8 @@ function commerce_braintree_js_cardonfile_form_submit(&$form, &$form_state) {
       ))->paymentMethod;
     } catch (Exception $ex) {
       watchdog('commerce_braintree', 'Unable to load/create a payment method due to @error', array('@error' => $ex->getMessage()), WATCHDOG_ERROR);
-      return;
+      drupal_set_message(t('We are unable to create a payment profile for you at this time.'), 'error');
+      return FALSE;
     }
   }
   else {
@@ -1277,8 +1279,16 @@ function commerce_braintree_js_cardonfile_form_submit(&$form, &$form_state) {
     }
     catch (Exception $ex) {
       watchdog('commerce_braintree', 'Unable to fetch Braintree customer account due to @error', array('@error' => $ex->getMessage()), WATCHDOG_ERROR);
-      return;
+      drupal_set_message(t('We are unable to create a payment profile for you at this time.'), 'error');
+      return FALSE;
     }
+  }
+
+  // Make sure a customer id is loaded or created before proceeding.
+  if (empty($customer->id)) {
+    watchdog('commerce_braintree', 'Unable to load or create a Braintree customer object', array(), WATCHDOG_ERROR);
+    drupal_set_message(t('We are unable to create a payment profile for you at this time.'), 'error');
+    return FALSE;
   }
 
   try {
@@ -1290,7 +1300,7 @@ function commerce_braintree_js_cardonfile_form_submit(&$form, &$form_state) {
   }
 
   // Update the customer object to make sure we have all payment methods.
-  $customer = Braintree_Customer::find($form_state['values']['customer_id']);
+  $customer = Braintree_Customer::find($customer->id);
 
   // Loop over each of the Braintree payment methods and make sure
   // a matching card on file entity exits.
