@@ -151,11 +151,18 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $argume
 
   // Initialize Braintree and create a token.
   commerce_braintree_initialize($payment_method);
-  $token = Braintree_ClientToken::generate($arguments);
+
+  $js_settings = array(
+    'environment' => $payment_method['settings']['environment'],
+    'clientToken' => Braintree_ClientToken::generate($arguments),
+  );
+
+  // Allow other modules to alter the JS settings.
+  drupal_alter('commerce_braintree_dropin_js', $js_settings, $payment_method);
 
   // The custom token is required to generate the Drop-in payment form.
   $form['#attached']['js'][] = array(
-    'data' => array('commerceBraintreeDropinToken' => $token),
+    'data' => array('commerceBraintreeDropin' => $js_settings),
     'type' => 'setting',
   );
 
