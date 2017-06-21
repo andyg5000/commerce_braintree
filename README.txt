@@ -16,17 +16,17 @@ See https://www.drupal.org/node/1440066 for more information on where to install
 libraries if you are not familiar with this process.
 
   1. Download the braintree_php library.
-     a. zip: https://github.com/braintree/braintree_php/archive/2.40.0.zip
-     b. tar.gz: https://github.com/braintree/braintree_php/archive/2.40.0.tar.gz
+     a. zip: https://github.com/braintree/braintree_php/archive/3.21.0.zip
+     b. tar.gz: https://github.com/braintree/braintree_php/archive/3.21.0.tar.gz
 
   2. Copy the library to your sites libraries folder and name it "braintree_php".
      The path should be libraries/braintree_php/lib if you've extracted it
      correctly.
 
-  3. This module is tested to work with the 2.40.0 release. We're not using 3.x
-     because PHP 5.2 and 5.3 were deprecated in the 3.x release and Drupal 7
-     sites may be versions down to 5.2.5 Other releases can be viewed here:
-     https://github.com/braintree/braintree_php/releases
+  3. This module is tested to work with the 3.21.0 release. A minimum of PHP 5.6
+     is required along with a version of libcul that supports TLS 1.2. These
+     dependencies, while stricter than Drupal 7, are in place because Braintree
+     endpoints will not respond to requests using lower TLS/SSL protocols.
 
 Download, install, and enable the Commerce Braintree module(s).
 
@@ -38,7 +38,13 @@ Download, install, and enable the Commerce Braintree module(s).
      Drop-In UI (iFrame) solution. If Rick Manelius sent you here, this is the
      implementation you want! We recommend his http://drupalpcicompliance.org/
      if you have questions about PCI in Drupal.
-     See https://www.braintreepayments.com/features/drop-in for more information.
+     See https://www.braintreepayments.com/features/seamless-checkout > Drop-in UI
+     for more information.
+
+  2. The "Braintree Hosted Fields" module includes an implementation of Braintree's
+     Hosted Fields solution where each credit card field is an embedded iFrame.
+     See https://www.braintreepayments.com/features/seamless-checkout > Hosted Fields
+     for more information.
 
 Add your Braintree account credentials for the enabled implementation(s).
 

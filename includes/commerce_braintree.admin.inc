@@ -82,7 +82,7 @@ function commerce_braintree_settle_form_submit($form, &$form_state) {
 
   // Inform the user if there were any issues submitting the settlement.
   if (empty($result) || empty($result->success)) {
-    $message = !empty($result->_attributes['message']) ? $result->_attributes['message'] : t('No error provided from Braintree');
+    $message = !empty($result->message) ? $result->message : t('No error provided from Braintree');
     drupal_set_message(t('The payment transaction could not be submitted for settlement. @message', array('@message' => $message)), 'error');
   }
 
@@ -91,9 +91,9 @@ function commerce_braintree_settle_form_submit($form, &$form_state) {
     drupal_set_message(t('Transaction submitted for settlement successfully.'));
     // Update the payment transaction values to show the settlement.
     $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-    $transaction->remote_status = $result->transaction->_attributes['status'];
+    $transaction->remote_status = $result->transaction->status;
     $transaction->message .= '<br />' . t('Submitted for settlement: @date', array('@date' => format_date(REQUEST_TIME, 'short')));
-    $transaction->amount = commerce_currency_decimal_to_amount($result->transaction->_attributes['amount'], $result->transaction->_attributes['currencyIsoCode']);
+    $transaction->amount = commerce_currency_decimal_to_amount($result->transaction->amount, $result->transaction->currencyIsoCode);
     commerce_payment_transaction_save($transaction);
   }
 
@@ -148,7 +148,7 @@ function commerce_braintree_void_form_submit($form, &$form_state) {
 
   // Inform the user if there were any issues processing the void.
   if (empty($result) || empty($result->success)) {
-    $message = !empty($result->_attributes['message']) ? $result->_attributes['message'] : t('No error provided from Braintree');
+    $message = !empty($result->message) ? $result->message : t('No error provided from Braintree');
     drupal_set_message(t('The payment transaction cannot be voided. @message', array('@message' => $message)), 'error');
   }
 
@@ -243,7 +243,7 @@ function commerce_braintree_refund_form_submit($form, &$form_state) {
 
   // Inform the user if there were any issues processing the refund.
   if (empty($result) || empty($result->success)) {
-    $message = !empty($result->_attributes['message']) ? $result->_attributes['message'] : t('No error provided from Braintree');
+    $message = !empty($result->message) ? $result->message : t('No error provided from Braintree');
     drupal_set_message(t('The payment transaction cannot be refunded at this time. @message', array('@message' => $message)), 'error');
   }
 
@@ -255,11 +255,11 @@ function commerce_braintree_refund_form_submit($form, &$form_state) {
     // Create a new transaction to record the refund.
     $refund_transaction = commerce_payment_transaction_new($transaction->payment_method, $order->order_id);
     $refund_transaction->instance_id = $payment_method['instance_id'];
-    $refund_transaction->remote_id = $result->transaction->_attributes['id'];
+    $refund_transaction->remote_id = $result->transaction->id;
     $refund_transaction->amount = $refund_amount * -1;
     $refund_transaction->currency_code = $transaction->currency_code;
     $refund_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-    $refund_transaction->remote_status = $result->transaction->_attributes['status'];
+    $refund_transaction->remote_status = $result->transaction->status;
     $refund_transaction->message = t('Credited to @remote_id.', array('@remote_id' => $transaction->remote_id));
 
     // Save the refund transaction.

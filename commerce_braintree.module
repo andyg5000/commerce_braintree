@@ -153,11 +153,11 @@ function commerce_braintree_update_card() {
     $payment_method = commerce_payment_method_instance_load('braintree_tr|commerce_payment_braintree_tr');
     commerce_braintree_initialize($payment_method);
     $result = Braintree_TransparentRedirect::confirm($feedback);
-    $token = $result->creditCard->_attributes['token'];
-    $cardholderName = $result->creditCard->_attributes['cardholderName'];
-    $expirationMonth = $result->creditCard->_attributes['expirationMonth'];
-    $expirationYear = $result->creditCard->_attributes['expirationYear'];
-    $last4 = $result->creditCard->_attributes['last4'];
+    $token = $result->creditCard->token;
+    $cardholderName = $result->creditCard->cardholderName;
+    $expirationMonth = $result->creditCard->expirationMonth;
+    $expirationYear = $result->creditCard->expirationYear;
+    $last4 = $result->creditCard->last4;
 
     $cards = commerce_cardonfile_load_multiple(FALSE, array('remote_id' => $token));
     $card_stored = reset($cards);
@@ -447,18 +447,18 @@ function commerce_braintree_tr_process_transaction($order, $payment_method, $fee
     // that will be used to reuse the card on file.
     $new_card_data->instance_id = $payment_method['instance_id'];
     // remote_id: the remote ID to the full card data at the payment gateway.
-    $new_card_data->remote_id = $result->transaction->_attributes['creditCard']['token'];
+    $new_card_data->remote_id = $result->transaction->creditCard['token'];
     // card_type: short name of the credit card type if determined, based on the
     // keys returned by commerce_payment_credit_card_types().
-    $new_card_data->card_type = $result->transaction->_attributes['creditCard']['cardType'];
+    $new_card_data->card_type = $result->transaction->creditCard['cardType'];
     // card_name: the name of the cardholder.
-    $new_card_data->card_name = $result->transaction->_attributes['creditCard']['cardholderName'];
+    $new_card_data->card_name = $result->transaction->creditCard['cardholderName'];
     // card_number: the last 4 digits of the credit card number.
-    $new_card_data->card_number = $result->transaction->_attributes['creditCard']['last4'];
+    $new_card_data->card_number = $result->transaction->creditCard['last4'];
     // card_exp_month: the numeric representation of the expiration month.
-    $new_card_data->card_exp_month = $result->transaction->_attributes['creditCard']['expirationMonth'];
+    $new_card_data->card_exp_month = $result->transaction->creditCard['expirationMonth'];
     // card_exp_year: the four digit expiration year.
-    $new_card_data->card_exp_year = $result->transaction->_attributes['creditCard']['expirationYear'];
+    $new_card_data->card_exp_year = $result->transaction->creditCard['expirationYear'];
     // status: integer status of the card data: inactive (0), active (1), or
     // active and not deletable (2).
     $new_card_data->status = 1;
@@ -865,7 +865,8 @@ function commerce_braintree_js_form_submit($payment_method, $pane_form, &$pane_v
     'billing' => array(
       'countryCodeAlpha2' => $country,
       'streetAddress' => $thoroughfare,
-      'firstName' => $customer_name,
+      'firstName' => $first_name,
+      'lastName' => $last_name,
       'locality' => $locality,
       'postalCode' => $postal_code,
       'region' => $administrative_area,
@@ -886,8 +887,14 @@ function commerce_braintree_js_form_submit($payment_method, $pane_form, &$pane_v
   }
 
 
-  // Update the request if it was submitted with a card on file.
-  if (!empty($pane_values['cardonfile']) && $pane_values['cardonfile'] != 'new') {
+  // Update the sale data to charge the card on file
+  // if it was the selected payment method. Ignore
+  // this option for drop-in transactions since
+  // they have their own card on file interface.
+  if (!empty($pane_values['cardonfile'])
+    && $pane_values['cardonfile'] != 'new'
+    && $payment_method['base'] != 'commerce_braintree_dropin') {
+
     $cardonfile = commerce_cardonfile_load($pane_values['cardonfile']);
     // Remove the nonce if the transaction is against a card on file.
     unset($sale_data['paymentMethodNonce']);
@@ -928,19 +935,25 @@ function commerce_braintree_js_form_submit($payment_method, $pane_form, &$pane_v
  * Save a commerce_payment_transaction object from the Braintree API response.
  */
 function commerce_braintree_js_process_transaction($order, $payment_method, $charge, $response) {
-  // Determine the charge amount from the response object.
-  $amount = $response->transaction->_attributes['amount'];
-  $currency_code = $response->transaction->_attributes['currencyIsoCode'];
-  $amount_converted = commerce_currency_decimal_to_amount($amount, $currency_code);
-
-  // Determine the payment transaction internal status from the response status.
-  $remote_status = !empty($response->transaction->_attributes['status']) ? $response->transaction->_attributes['status'] : NULL;
   $transaction = commerce_payment_transaction_new('braintree_dropin', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
-  $transaction->remote_id = !empty($response->transaction->_attributes['id']) ? $response->transaction->_attributes['id'] : NULL;
+  $transaction->remote_id = !empty($response->transaction->id) ? $response->transaction->id : NULL;
+  $transaction->payload[REQUEST_TIME] = $response;
+
+  if ($response instanceof \Braintree\Result\Error) {
+    $currency_code = $charge['currency_code'];
+    $amount_converted = commerce_currency_decimal_to_amount($charge['amount'], $charge['currency_code']);
+  }
+  else {
+    // Determine the charge amount from the response object.
+    $amount = $response->transaction->amount;
+    $currency_code = $response->transaction->currencyIsoCode;
+    $amount_converted = commerce_currency_decimal_to_amount($amount, $currency_code);
+  }
+  // Determine the payment transaction internal status from the response status.
+  $remote_status = !empty($response->transaction->status) ? $response->transaction->status : NULL;
   $transaction->amount = $amount_converted;
   $transaction->currency_code = $currency_code;
-  $transaction->payload[REQUEST_TIME] = $response;
   $transaction->status = commerce_braintree_transaction_status($remote_status);
   $transaction->remote_status = $remote_status;
   $transaction->message = commerce_braintree_build_payment_transaction_message($response);
@@ -952,11 +965,12 @@ function commerce_braintree_js_process_transaction($order, $payment_method, $cha
  * Save a cardonfile entity from the JS based payment response.
  */
 function commerce_braintree_js_create_cardonfile($order, $payment_method, $response) {
-  $attributes = !empty($response->transaction->_attributes) ? $response->transaction->_attributes : array();
-  if (empty($attributes['creditCard']['token'])) {
+  if (empty($response->transaction->creditCard)) {
+    watchdog('commerce_braintree', 'Cannot create card on file entity for order @order_id because there was no credit card property in the response provided by Braintree', array('@order_id' => $order->order_id), WATCHDOG_ERROR);
     return FALSE;
   }
-  $token = $attributes['creditCard']['token'];
+
+  $token = $response->transaction->creditCard['token'];
 
   // Attempt to load an existing card on file with the same token before
   // creating a new one.
@@ -969,23 +983,23 @@ function commerce_braintree_js_create_cardonfile($order, $payment_method, $respo
   }
 
   // Populate all of the cardonfile properties from the response object.
-  $cardonfile->card_name = $attributes['customer']['firstName'] . ' ' . $attributes['customer']['lastName'];
-  $cardonfile->card_type = $attributes['creditCard']['cardType'];
-  $cardonfile->card_exp_month = $attributes['creditCard']['expirationMonth'];
-  $cardonfile->card_exp_year = $attributes['creditCard']['expirationYear'];
-  $cardonfile->card_number = $attributes['creditCard']['last4'];
+  $cardonfile->card_name = $response->transaction->billing['firstName'] . ' ' . $response->transaction->billing['lastName'];
+  $cardonfile->card_type = $response->transaction->creditCard['cardType'];
+  $cardonfile->card_exp_month = $response->transaction->creditCard['expirationMonth'];
+  $cardonfile->card_exp_year = $response->transaction->creditCard['expirationYear'];
+  $cardonfile->card_number = $response->transaction->creditCard['last4'];
   $cardonfile->payment_method = $payment_method['method_id'];
   $cardonfile->instance_id = $payment_method['instance_id'];
   $cardonfile->instance_default = TRUE;
   $cardonfile->uid = $order->uid;
-  $cardonfile->remote_id = $attributes['creditCard']['token'];
+  $cardonfile->remote_id = $response->transaction->creditCard['token'];
   $cardonfile->status = TRUE;
 
   commerce_cardonfile_save($cardonfile);
 
   // Save the Braintree vault data to the user profile.
   $user = user_load($order->uid);
-  $user->data['braintree_vault'] = $attributes['customer'];
+  $user->data['braintree_vault'] = $response->transaction->customer;
   user_save($user);
 }
 
