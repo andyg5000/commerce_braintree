@@ -942,7 +942,7 @@ function commerce_braintree_js_process_transaction($order, $payment_method, $cha
 
   if ($response instanceof \Braintree\Result\Error) {
     $currency_code = $charge['currency_code'];
-    $amount_converted = commerce_currency_decimal_to_amount($charge['amount'], $charge['currency_code']);
+    $amount_converted = $charge['amount'];
   }
   else {
     // Determine the charge amount from the response object.
