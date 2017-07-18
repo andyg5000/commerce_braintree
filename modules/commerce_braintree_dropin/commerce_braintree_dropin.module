@@ -30,6 +30,7 @@ function commerce_braintree_dropin_commerce_payment_method_info() {
       'create callback' => 'commerce_braintree_js_cardonfile_form_submit',
       'update callback' => 'commerce_braintree_js_cardonfile_form_submit',
       'delete callback' => 'commerce_braintree_cardonfile_update_delete',
+      'charge callback' => 'commerce_braintree_cardonfile_charge',
     ),
   );
 

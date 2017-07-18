@@ -193,6 +193,7 @@ function commerce_braintree_commerce_payment_method_info() {
     'cardonfile' => array(
       'update callback' => 'commerce_braintree_cardonfile_update_delete',
       'delete callback' => 'commerce_braintree_cardonfile_update_delete',
+      'charge callback' => 'commerce_braintree_cardonfile_charge',
     )
   );
 
@@ -1001,6 +1002,56 @@ function commerce_braintree_js_create_cardonfile($order, $payment_method, $respo
   $user = user_load($order->uid);
   $user->data['braintree_vault'] = $response->transaction->customer;
   user_save($user);
+}
+
+/**
+ * Commerce Card on File charge callback.
+ */
+function commerce_braintree_cardonfile_charge($payment_method, $card_data, $order, $charge) {
+  // Determine if we should settle the transaction immediately.
+  if (isset($payment_method['settings']['submit_for_settlement'])) {
+    $submit_for_settlement = (bool) $payment_method['settings']['submit_for_settlement'];
+  }
+  else {
+    // Default to TRUE if this setting hasn't been explicitly set by the store admin.
+    $submit_for_settlement = TRUE;
+  }
+
+  // Create the sale data object to submit to Braintree.
+  $sale_data = array(
+    'amount' => commerce_currency_amount_to_decimal($charge['amount'], $charge['currency_code']),
+    'orderId' => $order->order_id,
+    'paymentMethodToken' => $card_data->remote_id,
+    'merchantAccountId' => commerce_braintree_get_merchant_account_id($payment_method, $charge['currency_code']),
+    'options' => array(
+      'submitForSettlement' => $submit_for_settlement,
+    ),
+  );
+
+  // Allow other modules to alter the sale data.
+  drupal_alter('commerce_braintree_dropin_sale_data', $sale_data, $order);
+
+  // Attempt to charge the card on file.
+  commerce_braintree_initialize($payment_method);
+  $response = Braintree_Transaction::sale($sale_data);
+
+  // Process the response and create a commerce payment transaction.
+  $transaction = commerce_braintree_js_process_transaction($order, $payment_method, $charge, $response);
+
+  $message_vars = array(
+    '@order' => $order->order_id,
+    '@amount' => commerce_currency_format($charge['amount'], $charge['currency_code'], NULL, TRUE),
+  );
+
+  // Return the result of the transaction and the feedback for the user.
+  if (!empty($transaction->status) && $transaction->status != COMMERCE_PAYMENT_STATUS_FAILURE) {
+    drupal_set_message(t('Payment transaction for @order in the amount of @amount successful.', $message_vars));
+    return TRUE;
+  }
+  else {
+    drupal_set_message(t('Payment transaction for @order in the amount of @amount failed.', $message_vars), 'error');
+    return FALSE;
+  }
 }
 
 /**
