@@ -86,10 +86,6 @@ function commerce_braintree_dropin_form_alter(&$form, &$form_state, $form_id) {
 function commerce_braintree_dropin_form_commerce_payment_order_transaction_add_form_alter(&$form, &$form_state) {
   // Include the Braintree Drop-in UI when it is selected as the payment method.
   if (!empty($form['payment_terminal']) && $form_state['payment_method']['method_id'] == 'braintree_dropin') {
-
-    // Drop-in UI has it's own card on file UI.
-    $form['payment_terminal']['payment_details']['cardonfile']['#access'] = FALSE;
-
     $arguments = array();
     if (!empty($form_state['order']->uid)) {
       $account = user_load($form_state['order']->uid);
@@ -99,6 +95,19 @@ function commerce_braintree_dropin_form_commerce_payment_order_transaction_add_f
     }
 
     $form['payment_terminal']['payment_details'] += (array) commerce_braintree_dropin_submit_form_elements($form_state['payment_method'], $arguments);
+  }
+}
+
+/**
+ * Implements hook_commerce_cardonfile_payment_terminal_form_alter().
+ */
+function commerce_braintree_commerce_cardonfile_payment_terminal_form_alter(&$form, &$form_state) {
+  // Drop-in UI has it's own interface for card on file, so we disable
+  // access to the cardonfile form elements when drop-in is selected.
+  if (!empty($form['payment_terminal']['payment_details']['cardonfile'])
+    && !empty($form_state['payment_method']['base'])
+    && $form_state['payment_method']['base'] == 'commerce_braintree_dropin') {
+    $form['payment_terminal']['payment_details']['cardonfile']['#access'] = FALSE;
   }
 }
 
