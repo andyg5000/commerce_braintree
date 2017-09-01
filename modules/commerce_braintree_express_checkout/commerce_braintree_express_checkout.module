@@ -259,9 +259,9 @@ function commerce_braintree_express_checkout_button_form($order, $payment_method
     'payloadInput' => 'commerce_braintree_payload',
     'instanceId' => COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID,
     'buttonStyle' => array(
-      'size' => 'responsive',
-      'color' => 'silver',
-      'shape' => 'rect',
+      'size' => 'small',
+      'color' => 'gold',
+      'shape' => 'pill',
       'label' => 'checkout',
     ),
     'flow' => 'checkout',
@@ -281,7 +281,7 @@ function commerce_braintree_express_checkout_button_form($order, $payment_method
   // Create a DOM element for the EC button.
   $form['commerce_braintree_ec_button'] = array(
     '#markup' => '<div id="' . $js_settings['buttonId'] . '"></div>',
-    '#weight' => -1,
+    '#weight' => 10,
   );
 
   $form['commerce_braintree_payload'] = array(
