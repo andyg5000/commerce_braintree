@@ -6,9 +6,13 @@
                 var $expressCheckoutForm = $(context).find('#' + settings.commerceBraintreeExpressCheckout.buttonId).once();
                 if ($expressCheckoutForm.length) {
                     var waitForSdk = setInterval(function () {
+
+                        // Make sure that braintree and paypal SDKs have been loaded.
                         if (typeof braintree !== 'undefined' && typeof paypal !== 'undefined') {
                             clearInterval(waitForSdk);
                             var $form = $expressCheckoutForm.closest('form');
+
+                            // Set up the Express Checkout button and event handlers.
                             Drupal.braintreeExpressCheckout = new Drupal.commerceBraintreeExpressCheckout($form, settings.commerceBraintreeExpressCheckout);
                             Drupal.braintreeExpressCheckout.bootstrap();
 
@@ -20,37 +24,44 @@
 
             }
         }
-    }
+    };
 
+    /**
+     * Initializes the object for Express Checkout.
+     *
+     * @param $form
+     *   The jQuery DOM element where the form is scoped.
+     * @param settings
+     *   The Express Checkout settings provided by Drupal.
+     *
+     * @returns {Drupal}
+     */
     Drupal.commerceBraintreeExpressCheckout = function ($form, settings) {
         this.settings = settings;
         this.$form = $form;
         this.fromId = this.$form.attr('id');
-        this.$submit = this.$form.find('[name=op]');
-        this.error = '';
+        this.$submit = this.$form.find(settings.submitSelector);
         this.ecButtonSelector = '#' + settings.buttonId;
         this.$ecButton = this.$form.find(this.ecButtonSelector);
         this.$payloadInput = $('input[name="' + settings.payloadInput +'"]', $form);
-        this.$nonceInput = $('input[name="' + settings.nonceInput +'"]', $form);
+        this.$nonceInput = $(settings.nonceSelector);
         return this;
     };
 
+    /**
+     * Creates the Braintree client and PayPal Express Checkout button.
+     */
     Drupal.commerceBraintreeExpressCheckout.prototype.bootstrap = function () {
-        braintree.client.create(this.getOptions(), function(clientErr, clientInstance){
+        braintree.client.create(this.settings.options, function(clientErr, clientInstance){
             Drupal.braintreeExpressCheckout.getButton(clientErr, clientInstance);
         });
     };
 
-    Drupal.commerceBraintreeExpressCheckout.prototype.getOptions = function () {
-        var options = {
-            authorization: this.settings.clientToken
-        };
-
-        options = $.extend(options, this.settings);
-
-        return options;
-    };
-
+    /**
+     * Sets up the Express Checkout button and events.
+     * @param clientErr
+     * @param clientInstance
+     */
     Drupal.commerceBraintreeExpressCheckout.prototype.getButton = function(clientErr, clientInstance) {
 
         if (clientErr) {
@@ -76,51 +87,35 @@
                 // Button styles.
                 style: Drupal.braintreeExpressCheckout.settings.buttonStyle,
 
-                // Payment handler.
+                // Creates the Braintree Payment info for Express Checkout.
                 payment: function () {
-                    return paypalCheckoutInstance.createPayment({
-                        flow: Drupal.braintreeExpressCheckout.settings.flow,
-                        amount: Drupal.braintreeExpressCheckout.settings.amount,
-                        currency: Drupal.braintreeExpressCheckout.settings.currencyCode,
-                        enableShippingAddress: true
-                    });
+                    return paypalCheckoutInstance.createPayment( Drupal.braintreeExpressCheckout.settings.createPaymentOptions);
                 },
 
-                // Authorization handler.
+                // Authorization handler fires when Express Checkout is
+                // successful.
                 onAuthorize: function (data, actions) {
                     return paypalCheckoutInstance.tokenizePayment(data)
                         .then(function (payload) {
-                            // Populate the payload input if available.
-                            if (Drupal.braintreeExpressCheckout.$payloadInput.length > 0) {
-                                Drupal.braintreeExpressCheckout.$payloadInput.val(JSON.stringify(payload));
-                            }
-
-                            // Populate the nonce input if available.
-                            var $nonceField = $('input[name="' + Drupal.braintreeExpressCheckout.settings.nonceInput + '"]');
-                            if ($nonceField.length > 0) {
-                               $nonceField.val(payload.nonce);
-                            }
-
-                            // Submit the form.
-                            Drupal.braintreeExpressCheckout.$submit.trigger('click');
+                            Drupal.braintreeExpressCheckout.payloadReceived(payload);
                         });
                 },
 
                 // Cancel handler.
-                onCancel: function (data) {
-                    console.log("checkout.js payment cancelled", JSON.stringify(data, 0, 2));
-                },
+                onCancel: function (data) {},
 
                 // Error handler.
-                onError: function (err) {
-                    console.error("checkout.js error", err);
-                }
+                onError: function (err) {}
+
             }, Drupal.braintreeExpressCheckout.ecButtonSelector).then(function () {
                 // Button has been initialized.
             });
         });
     };
 
+    /**
+     * Adds event handlers to the payment method selector form on checkout.
+     */
     Drupal.commerceBraintreeExpressCheckout.prototype.paymentMethodEvents = function() {
         var paymentSelector = $('input[name="commerce_payment[payment_method]"',  Drupal.braintreeExpressCheckout.$form);
         if (paymentSelector.length > 0) {
@@ -136,24 +131,52 @@
         }
     };
 
+    /**
+     * Handles the payload response from PayPal.
+     *
+     * @param payload
+     *   The Express Checkout payload.
+     */
+    Drupal.commerceBraintreeExpressCheckout.prototype.payloadReceived = function (payload) {
+        // Populate the payload input if available.
+        if (this.$payloadInput.length > 0) {
+            this.$payloadInput.val(JSON.stringify(payload));
+        }
+
+        // Populate the nonce input if available.
+        if (this.$nonceInput.length > 0) {
+            this.$nonceInput.val(payload.nonce);
+        }
+
+        // Submit the form and disable the submit button.
+        this.$submit.trigger('click');
+        this.$submit.attr({'disabled' : 'disabled'});
+    };
+
+    /**
+     * Handles toggling the checkout submit and Express Checkout buttons.
+     *
+     * @param element
+     *   A jQuery DOM element.
+     */
     Drupal.commerceBraintreeExpressCheckout.prototype.toggleCheckout = function(element) {
         // Always show submit and hide PayPal Express checkout when the nonce
         // field is available and filled.
-        if (Drupal.braintreeExpressCheckout.$nonceInput.length > 0 && Drupal.braintreeExpressCheckout.$nonceInput.val() != '') {
-            Drupal.braintreeExpressCheckout.$submit.show();
-            Drupal.braintreeExpressCheckout.$ecButton.hide();
+        if (this.$nonceInput.length > 0 && this.$nonceInput.val() != '') {
+            this.$submit.show();
+            this.$ecButton.hide();
             return;
         }
 
         // If Express Checkout method is selected, hide the Commerce submit
         // button and show the Express Checkout payment button.
-        if (element.val() == Drupal.braintreeExpressCheckout.settings.instanceId) {
-            Drupal.braintreeExpressCheckout.$submit.hide();
-            Drupal.braintreeExpressCheckout.$ecButton.show();
+        if (element.val() == this.settings.instanceId) {
+            this.$submit.hide();
+            this.$ecButton.show();
         }
         else {
-            Drupal.braintreeExpressCheckout.$submit.show();
-            Drupal.braintreeExpressCheckout.$ecButton.hide();
+            this.$submit.show();
+            this.$ecButton.hide();
         }
     };
 })(jQuery);
