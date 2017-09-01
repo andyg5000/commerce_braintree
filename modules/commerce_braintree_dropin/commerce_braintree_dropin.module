@@ -5,6 +5,26 @@
  * Provides integration with Braintree Drop-in UI.
  */
 
+
+/**
+ * Implements hook_library().
+ */
+function commerce_braintree_dropin_library() {
+  $path = drupal_get_path('module', 'commerce_braintree_dropin');
+  $libraries['braintree.dropin'] = array(
+    'title' => 'Braintree DropIn',
+    'website' => 'https://braintreepayments.com',
+    'version' => '1.7.0',
+    'js' => array(
+      'https://js.braintreegateway.com/web/dropin/1.7.0/js/dropin.min.js' => array(
+        'type' => 'external',
+      ),
+      $path . '/js/commerce_braintree_dropin.js' => array(),
+    ),
+  );
+  return $libraries;
+}
+
 /**
  * Implements hook_commerce_payment_method_info().
  */
@@ -55,12 +75,6 @@ function commerce_braintree_dropin_form_alter(&$form, &$form_state, $form_id) {
     }
 
     if (!empty($drop_in)) {
-      // Make sure the Drop-in javascript api is included.
-      $form['#attached']['js'][] = array(
-        'data' => 'https://js.braintreegateway.com/v2/braintree.js',
-        'type' => 'external',
-      );
-
       // When there is more than 1 payment method available, replace the
       // ajax handler for the payment method selector so that the entire
       // form is reloaded. Otherwise you cannot switch between different
@@ -165,6 +179,9 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $argume
   $js_settings = array(
     'environment' => $payment_method['settings']['environment'],
     'clientToken' => Braintree_ClientToken::generate($arguments),
+    'containerId' => 'commerce-braintree-dropin-container',
+    'submitSelector' => '.checkout-continue',
+    'nonceInput' => 'commerce_payment[payment_details][nonce]',
   );
 
   // Allow other modules to alter the JS settings.
@@ -176,18 +193,16 @@ function commerce_braintree_dropin_submit_form_elements($payment_method, $argume
     'type' => 'setting',
   );
 
-  // Make sure the Drop-in javascript api is included.
-  $form['#attached']['js'][] = array(
-    'data' => 'https://js.braintreegateway.com/v2/braintree.js',
-    'type' => 'external',
-  );
-
-  // Attach our own javascript to handle the Drop-in form generation.
-  $form['#attached']['js'][] = drupal_get_path('module', 'commerce_braintree_dropin') . '/js/commerce_braintree_dropin.js';
+  $form['#attached']['library'][] = array('commerce_braintree_dropin', 'braintree.dropin');
 
   // Include a container div for the Drop-in form to attach to.
   $form['braintree_dropin'] = array(
     '#markup' => '<div id="commerce-braintree-dropin-container"></div>',
+  );
+
+  // Add a field to store the nonce.
+  $form['nonce'] = array(
+    '#type' => 'hidden',
   );
 
   // Add option to save card on file for authenticated users.

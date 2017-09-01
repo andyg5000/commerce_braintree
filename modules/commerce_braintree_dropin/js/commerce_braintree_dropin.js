@@ -10,7 +10,7 @@
                 var $dropInForm = $(context).find('#commerce-braintree-dropin-container').once();
                 if ($dropInForm.length) {
                     var waitForSdk = setInterval(function () {
-                        if (typeof braintree !== 'undefined') {
+                        if (typeof braintree !== 'undefined' && typeof braintree.dropin !== 'undefined') {
                             clearInterval(waitForSdk);
                             var $form = $dropInForm.closest('form');
                             Drupal.braintreeDropIn = new Drupal.commerceBraintreeDropin($form, settings.commerceBraintreeDropin);
@@ -18,13 +18,6 @@
                         }
                     }, 100);
                 }
-
-                // Braintree hijacks all submit buttons for this form. Simulate the back
-                // button to make sure back submit still works.
-                $('.checkout-cancel,.checkout-back', context).click(function (e) {
-                    e.preventDefault();
-                    window.history.back();
-                });
             }
         }
     };
@@ -35,25 +28,39 @@
         this.fromId = this.$form.attr('id');
         this.$submit = this.$form.find('[name=op]');
         this.error = '';
+        this.$nonceInput = $('input[name="' + settings.nonceInput +'"]', $form);
         return this;
     };
 
     Drupal.commerceBraintreeDropin.prototype.bootstrap = function () {
         var options = this.getOptions();
-        braintree.setup(this.settings.clientToken, 'dropin', options);
+        var button = document.querySelector(Drupal.braintreeDropIn.settings.submitSelector);
+        braintree.dropin.create({
+            authorization: options.clientToken,
+            container: '#' + options.containerId
+        }, function (createErr, instance) {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
+                instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
+                    if (requestPaymentMethodErr) {
+                        // No payment method is available.
+                        // An appropriate error will be shown in the UI.
+                        console.error(requestPaymentMethodErr);
+                        Drupal.braintreeDropIn.resetSubmitBtn();
+                        return;
+                    }
+
+                    Drupal.braintreeDropIn.payloadReceived(payload);
+                });
+            });
+        });
     };
 
     Drupal.commerceBraintreeDropin.prototype.resetSubmitBtn = function () {
         $('.checkout-processing', this.$form).addClass('element-invisible');
-        this.$submit.next('.checkout-continue').removeAttr('disabled');
-    };
-
-    Drupal.commerceBraintreeDropin.prototype.errorMsg = function (response) {
-       this.error = response.message;
-    };
-
-    Drupal.commerceBraintreeDropin.prototype.showError = function (message) {
-        this.resetSubmitBtn();
+        this.$submit.removeAttr('disabled');
+        this.$submit.next('.checkout-continue').remove();
+        this.$submit.show();
     };
 
     Drupal.commerceBraintreeDropin.prototype.getOptions = function () {
@@ -61,20 +68,21 @@
             onReady: $.proxy(this.onReady, this),
             onError: $.proxy(this.onError, this),
             id: this.fromId,
-            container: 'commerce-braintree-dropin-container'
+            container: '#commerce-braintree-dropin-container',
+            authorization: this.settings.clientToken,
+            paypal: {
+                flow: 'vault'
+            }
         };
 
         options = $.extend(options, this.settings);
         return options;
     };
 
-    Drupal.commerceBraintreeDropin.prototype.onPaymentMethodReceived = function (payload) {
-        this.$submit.removeAttr('disabled');
+    Drupal.commerceBraintreeDropin.prototype.payloadReceived = function (payload) {
+        this.$submit.attr({'disabled' : 'disabled'});
+        this.$nonceInput.val(payload.nonce);
         this.$form.submit();
-    };
-
-    Drupal.commerceBraintreeDropin.prototype.onReady = function (integration) {
-        this.integration = integration;
     };
 
     // Global event callback.
