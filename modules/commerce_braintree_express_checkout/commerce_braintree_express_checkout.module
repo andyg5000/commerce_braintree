@@ -1,0 +1,420 @@
+<?php
+
+/**
+ * @file
+ * Provides integration PayPal Express Checkout for Braintree.
+ */
+
+define('COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID', 'braintree_express_checkout|commerce_payment_braintree_express_checkout');
+
+/**
+ * Implements hook_library().
+ */
+function commerce_braintree_express_checkout_library() {
+  $path = drupal_get_path('module', 'commerce_braintree_express_checkout');
+  $libraries['braintree.expresscheckout'] = array(
+    'title' => 'Braintree Express Checkout',
+    'website' => 'https://developer.paypal.com/docs/accept-payments/express-checkout/ec-braintree-sdk/client-side/javascript/v3/',
+    'version' => '3.22.2',
+    'js' => array(
+      'https://js.braintreegateway.com/web/3.22.2/js/client.min.js' => array(
+        'type' => 'external',
+      ),
+      'https://js.braintreegateway.com/web/3.22.2/js/paypal-checkout.min.js' => array(
+        'type' => 'external',
+      ),
+      'https://www.paypalobjects.com/api/checkout.js' => array(
+        'type' => 'external',
+      ),
+      $path . '/js/commerce_braintree_express_checkout.js' => array(),
+    ),
+  );
+  return $libraries;
+}
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_braintree_express_checkout_commerce_payment_method_info() {
+  $payment_methods = array();
+
+  $payment_methods['braintree_express_checkout'] = array(
+    'base' => 'commerce_braintree_express_checkout',
+    'title' => t('Braintree Express Checkout'),
+    'short_title' => t('Braintree Express Checkout'),
+    'display_title' => t('PayPal'),
+    'description' => t('Integrates with PayPal Express Checkout for secure on-site credit card payment through Braintree.'),
+    'callbacks' => array(
+      'submit_form_validate' => 'commerce_braintree_express_checkout_form_validate',
+      'submit_form_submit' => 'commerce_braintree_express_checkout_form_submit',
+    ),
+  );
+
+  return $payment_methods;
+}
+
+/**
+ * Returns the default settings for Express Checkout.
+ */
+function commerce_braintree_express_checkout_default_settings() {
+  return array(
+    'merchant_id' => '',
+    'public_key' => '',
+    'private_key' => '',
+    'merchant_account_id' => '',
+    'descriptor_name' => '',
+    'environment' => 'sandbox',
+    'submit_for_settlement' => TRUE,
+    'show_on_cart' => TRUE,
+    'update_billing_profiles' => TRUE,
+    'update_shipping_profiles' => TRUE,
+  );
+}
+
+/**
+ * Payment method callback: Braintree Express Checkout settings.
+ *
+ * @see CALLBACK_commerce_payment_method_settings_form()
+ */
+function commerce_braintree_express_checkout_settings_form($settings = array()) {
+  $settings = $settings + commerce_braintree_express_checkout_default_settings();
+  // Reuse the transparent redirect settings form.
+  $form = commerce_braintree_settings_form($settings);
+  $form['show_on_cart'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Express Checkout on cart page'),
+    '#description' => t('Show PayPal Express Checkout button on the shopping cart page (/cart)'),
+    '#default_value' => $settings['show_on_cart'],
+  );
+
+  $form['update_billing_profiles'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Update billing customer profiles with address information the customer enters at PayPal.'),
+    '#default_value' => $settings['update_billing_profiles'],
+  );
+
+  if (module_exists('commerce_shipping')) {
+    $form['update_shipping_profiles'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Update shipping customer profiles with address information the customer enters at PayPal.'),
+      '#default_value' => $settings['update_shipping_profiles'],
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ */
+function commerce_braintree_express_checkout_module_implements_alter(&$implementations, $hook) {
+  // Move our form alter implementations to the end so that the
+  // order object is available when altering the views cart form.
+  if ($hook == 'form_alter') {
+    $implementation = $implementations['commerce_braintree_express_checkout'];
+    unset($implementations['commerce_braintree_express_checkout']);
+    $implementations['commerce_braintree_express_checkout'] = $implementation;
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function commerce_braintree_express_checkout_form_alter(&$form, &$form_state, $form_id) {
+  if (strpos($form_id, 'commerce_checkout_form') === 0 && !empty($form['commerce_payment'])) {
+    $order = $form_state['order'];
+    $ec_payment_method = commerce_payment_method_instance_load(COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID);
+
+    if (!empty($order->data['commerce_braintree_express_checkout']['nonce'])) {
+      $nonce = $order->data['commerce_braintree_express_checkout']['nonce'];
+
+      // If the order contains a valid nonce alter the payment form
+      // to set Express Checkout as the payment option.
+      if (commerce_braintree_express_checkout_validate_nonce($nonce)) {
+
+        // Don't alter the payment form if another payment method was
+        // manually selected.
+        if (!empty($form_state['triggering_element']['#name'])
+          && $form_state['triggering_element']['#name'] == 'commerce_payment[payment_method]'
+          && $form_state['triggering_element']['#value'] != COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID) {
+          return;
+        }
+
+        // Force the payment method to be Express Checkout.
+        $form['commerce_payment']['payment_method']['#default_value'] = COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID;
+
+        // Update the payment method label to show the PayPal account.
+        $label = t('Pay with your PayPal account (@mail).', array('@mail' => $order->data['commerce_braintree_express_checkout']['details']['email']));
+        $form['commerce_payment']['payment_method']['#options'][COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID] = $label;
+
+        $form['commerce_payment']['payment_details'] = commerce_braintree_express_checkout_submit_form($ec_payment_method, array(), $form['commerce_payment'], $order);
+      }
+    }
+    $form['buttons'] += commerce_braintree_express_checkout_button_form($order, $ec_payment_method);
+  }
+}
+
+/**
+ * Form callback for Braintree Express Checkout payment method.
+ *
+ * @see CALLBACK_commerce_payment_method_submit_form().
+ */
+function commerce_braintree_express_checkout_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  $nonce = FALSE;
+
+  if (!empty($order->data['commerce_braintree_express_checkout']['nonce'])) {
+    $nonce = $order->data['commerce_braintree_express_checkout']['nonce'];
+
+    // Unset the nonce if it's no longer valid.
+    if (!commerce_braintree_express_checkout_validate_nonce($nonce)) {
+      $nonce = FALSE;
+    }
+  }
+
+  $form['nonce'] = array(
+    '#type' => 'hidden',
+    '#default_value' =>  $nonce,
+  );
+
+  return $form;
+}
+
+function commerce_braintree_express_checkout_form_validate($payment_method, $pane_values, $checkout_pane, $order) {
+ $f = false;
+  return FALSE;
+  return commerce_braintree_js_form_validate($payment_method, $pane_values, $checkout_pane, $order);
+}
+
+function commerce_braintree_express_checkout_form_submit($payment_method, $pane_form, &$pane_values, $order, $charge) {
+  $f = false;
+ return commerce_braintree_js_form_submit($payment_method, $pane_form, $pane_values, $order, $charge);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function commerce_braintree_express_checkout_form_views_form_commerce_cart_form_default_alter(&$form, &$form_state, $form_id) {
+  if (!empty($form_state['build_info']['args'][0]->result)) {
+    $order = $form_state['order'];
+    if (_commerce_braintree_express_checkout_enabled($order)) {
+      $payment_method = commerce_payment_method_instance_load(COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID);
+
+      if (!empty($payment_method['settings']['show_on_cart'])) {
+        // Add the Express Checkout to the cart form.
+        $form['actions'] += commerce_braintree_express_checkout_button_form($form_state['order'], $payment_method);
+
+        // Append our checkout submit handler to save the response from PayPal.
+        $form['actions']['checkout']['#submit'][] = 'commerce_braintree_express_checkout_submit';
+      }
+    }
+  }
+}
+
+/**
+ * Validates that a nonce is still active and has not been consumed.
+ *
+ * @param $nonce
+ *   The Braintree nonce.
+ * @return bool
+ *   TRUE if the nonce is still valid.
+ */
+function commerce_braintree_express_checkout_validate_nonce($nonce) {
+  // Utilize static caching to prevent extraneous API calls.
+  $valid = &drupal_static(__FUNCTION__);
+
+  if (!isset($valid)) {
+    $payment_method = commerce_payment_method_instance_load(COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID);
+    commerce_braintree_initialize($payment_method);
+    $result = Braintree_PaymentMethodNonce::find($nonce);
+    // The nonce is valid if a response is returned and it has not been
+    // previously consumed.
+    $valid = !empty($result) && isset($result->consumed) && $result->consumed == FALSE;
+  }
+
+  return $valid;
+}
+
+function commerce_braintree_express_checkout_button_form($order, $payment_method) {
+  $form = array();
+
+  // Make sure the payment method is available.
+  if (empty($payment_method)) {
+    return $form;
+  }
+
+  commerce_braintree_initialize($payment_method);
+  $form['#attached']['library'][] = array(
+    'commerce_braintree_express_checkout',
+    'braintree.expresscheckout'
+  );
+
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $amount = $order_wrapper->commerce_order_total->value();
+
+  $js_settings = array(
+    'environment' => $payment_method['settings']['environment'],
+    'clientToken' => Braintree_ClientToken::generate(),
+    'buttonId' => 'commerce-braintree-express-checkout-button',
+    'nonceInput' => 'commerce_payment[payment_details][nonce]',
+    'payloadInput' => 'commerce_braintree_payload',
+    'instanceId' => COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID,
+    'buttonStyle' => array(
+      'size' => 'responsive',
+      'color' => 'silver',
+      'shape' => 'rect',
+      'label' => 'checkout',
+    ),
+    'flow' => 'checkout',
+    'amount' => commerce_currency_amount_to_decimal($amount['amount'], $amount['currency_code']),
+    'currencyCode' => $amount['currency_code'],
+  );
+
+  // Allow other modules to alter the JS settings.
+  drupal_alter('commerce_braintree_express_checkout_js', $js_settings, $payment_method);
+
+  // Add Express Checkout JS settings object.
+  $form['#attached']['js'][] = array(
+    'data' => array('commerceBraintreeExpressCheckout' => $js_settings),
+    'type' => 'setting',
+  );
+
+  // Create a DOM element for the EC button.
+  $form['commerce_braintree_ec_button'] = array(
+    '#markup' => '<div id="' . $js_settings['buttonId'] . '"></div>',
+    '#weight' => -1,
+  );
+
+  $form['commerce_braintree_payload'] = array(
+    '#type' => 'hidden',
+  );
+
+  return $form;
+}
+
+function commerce_braintree_express_checkout_submit($form, &$form_state) {
+  $payment_method = commerce_payment_method_instance_load(COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID);
+
+  $order = $form_state['order'];
+  if (!empty($order)) {
+    drupal_set_message('');
+  }
+
+  if (!empty($form_state['values']['commerce_braintree_payload'])) {
+    $payload = json_decode($form_state['values']['commerce_braintree_payload'], TRUE);
+    if (empty($payload['nonce'])) {
+      watchdog('commerce_braintree_express_checkout', 'Payload submitted without a nonce.', array(), WATCHDOG_ERROR);
+      return;
+    }
+
+    $order->data['commerce_braintree_express_checkout'] = $payload;
+    if (empty($order->mail)) {
+      $order->mail = $payload['details']['email'];
+    }
+
+    // Create a billing information profile for the order with the available info.
+    if (!empty($payment_method['settings']['update_billing_profiles'])) {
+      commerce_braintree_express_checkout_create_customer_profile($order, 'billing', $payload, TRUE);
+    }
+
+    // If the shipping module exists on the site, create a shipping information
+    // profile for the order with the available info.
+    if (module_exists('commerce_shipping') && !empty($payment_method['settings']['update_shipping_profiles'])) {
+      commerce_braintree_express_checkout_create_customer_profile($order, 'shipping', $payload, TRUE);
+    }
+
+    // Save the order updates.
+    commerce_order_save($order);
+  }
+}
+
+function _commerce_braintree_express_checkout_enabled($order = NULL) {
+  if (!empty($order)) {
+    $order->payment_methods = array();
+    rules_invoke_all('commerce_payment_methods', $order);
+    uasort($order->payment_methods, 'drupal_sort_weight');
+    return in_array(COMMERCE_BRAINTREE_EXPRESS_CHECKOUT_INSTANCE_ID, array_keys($order->payment_methods));
+  }
+
+  $rule = rules_config_load('commerce_payment_braintree_express_checkout');
+  return !empty($rule->active);
+}
+
+
+/**
+ * Creates or updates a customer profile for an order based on information
+ * obtained from PayPal after an Express Checkout.
+ *
+ * @param $order
+ *   The order that was paid via Express Checkout.
+ * @param $profile_type
+ *   The type of the customer profile that should be created or updated.
+ * @param $payload
+ *   The payload array from a Express Checkout payload.
+ * @param $skip_save
+ *   Boolean indicating whether or not this function should skip saving the
+ *   order after setting it to reference the newly created customer profile;
+ *   defaults to TRUE, requiring the caller to save the order.
+ */
+function commerce_braintree_express_checkout_create_customer_profile($order, $profile_type, $payload, $skip_save = TRUE) {
+  // First check if the order already references a customer profile of the
+  // specified type.
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $field_name = variable_get('commerce_customer_profile_' . $profile_type . '_field', '');
+
+  // If the associated order field has been set and the order currently
+  // references a customer profile through it...
+  if (!empty($field_name) && !empty($order_wrapper->{$field_name})) {
+    // Update the existing customer profile.
+    $profile = $order_wrapper->{$field_name}->value();
+  }
+  elseif (!empty($order->data['profiles']['customer_profile_' . $profile_type])) {
+    // Otherwise look for an association stored in the order's data array.
+    $profile = commerce_customer_profile_load($order->data['profiles']['customer_profile_' . $profile_type]);
+  }
+
+  // Create a new profile if we could not find an existing one.
+  if (empty($profile)) {
+    $profile = commerce_customer_profile_new($profile_type, $order->uid);
+  }
+
+  // Add the order context to the profile to ensure it can be updated without
+  // resulting in customer profile duplication.
+  $profile->entity_context = array(
+    'entity_type' => 'commerce_order',
+    'entity_id' => $order->order_id,
+  );
+
+  // Prepare an addressfield array to set to the customer profile.
+  $field = field_info_field('commerce_customer_address');
+  $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', $profile_type);
+  $address = addressfield_default_values($field, $instance);
+
+  $address['first_name'] = $payload['details']['firstName'];
+  $address['last_name'] = $payload['details']['lastName'];
+  $address['name_line'] = $address['first_name'] . ' ' . $address['last_name'];
+
+  if ($profile_type == 'shipping' && !empty($payload['details']['shippingAddress'])) {
+    $address_values = $payload['details']['shippingAddress'];
+    $address = array_merge($address, array(
+      'country' => !empty($address_values['countryCode']) ? $address_values['countryCode'] : '',
+      'administrative_area' => !empty($address_values['state']) ? $address_values['state'] : '',
+      'locality' => !empty($address_values['city']) ? $address_values['city'] : '',
+      'postal_code' => !empty($address_values['postalCode']) ? $address_values['postalCode'] : '',
+      'thoroughfare' => !empty($address_values['line1']) ? $address_values['line1'] : '',
+      'premise' => !empty($address_values['line2']) ? $address_values['line2'] : '',
+    ));
+  }
+
+  // Add the addressfield value to the customer profile.
+  $profile_wrapper = entity_metadata_wrapper('commerce_customer_profile', $profile);
+  $profile_wrapper->commerce_customer_address = $address;
+
+  // Save the customer profile and update the order to reference it.
+  $profile_wrapper->save();
+  $order_wrapper->{'commerce_customer_' . $profile_type} = $profile_wrapper;
+
+  // Save the order if specified.
+  if (!$skip_save) {
+    $order_wrapper->save();
+  }
+}

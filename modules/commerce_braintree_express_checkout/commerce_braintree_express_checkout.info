@@ -1,0 +1,5 @@
+name = Braintree (Express Checkout)
+description = Integrates Braintree with PayPal Express Checkout
+package = Commerce (contrib)
+core = 7.x
+dependencies[] = commerce_braintree
