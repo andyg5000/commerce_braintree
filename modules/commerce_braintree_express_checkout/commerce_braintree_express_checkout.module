@@ -303,8 +303,31 @@ function commerce_braintree_express_checkout_button_form($order, $payment_method
       'flow' => 'checkout',
       'amount' => commerce_currency_amount_to_decimal($amount['amount'], $amount['currency_code']),
       'currency' => $amount['currency_code'],
+      'enableShippingAddress' => TRUE,
     ),
   );
+
+  // If a shipping address exists on the order, pass it to PayPal.
+  if (module_exists('commerce_shipping') && !empty($order->commerce_customer_shipping)) {
+    try {
+      $address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
+      $js_settings['createPaymentOptions'] += array(
+        'shippingAddressEditable' => FALSE,
+        'shippingAddressOverride' => array(
+          'recipientName' => $address['name_line'],
+          'line1' => $address['thoroughfare'],
+          'line2' => $address['premise'],
+          'city' => $address['locality'],
+          'countryCode' => $address['country'],
+          'postalCode' => $address['postal_code'],
+          'state' => $address['administrative_area'],
+        ),
+      );
+    }
+    catch (Exception $ex) {
+      watchdog('commerce_braintree_express_checkout', 'Unable to access commerce customer shipping address');
+    }
+  }
 
   // Allow other modules to alter the JS settings.
   drupal_alter('commerce_braintree_express_checkout_js', $js_settings, $payment_method);
