@@ -816,7 +816,7 @@ function _commerce_braintree_get_transaction_informations($order) {
  */
 function commerce_braintree_js_form_validate($payment_method, $pane_form, &$pane_values, $order, $charge) {
   // Make sure we have a valid nonce (sale token) returned from Braintree.
-  $nonce = commerce_braintree_js_get_nonce();
+  $nonce = !empty($pane_values['nonce']) ? $pane_values['nonce'] : commerce_braintree_js_get_nonce();
 
   // If this is not a card on file transaction, then a nonce is required.
   if (empty($nonce) && (empty($pane_values['cardonfile']) || $pane_values['cardonfile'] == 'new')) {
@@ -831,7 +831,7 @@ function commerce_braintree_js_form_validate($payment_method, $pane_form, &$pane
  * @see CALLBACK_commerce_payment_method_submit_form_submit()
  */
 function commerce_braintree_js_form_submit($payment_method, $pane_form, &$pane_values, $order, $charge) {
-  $nonce = commerce_braintree_js_get_nonce();
+  $nonce = !empty($pane_values['nonce']) ? $pane_values['nonce'] : commerce_braintree_js_get_nonce();
   commerce_braintree_initialize($payment_method);
 
   list($amount, $customer_name, $first_name, $last_name, $country, $thoroughfare, $locality, $postal_code, $administrative_area, $customer_mail) = _commerce_braintree_get_transaction_informations($order);
@@ -1313,7 +1313,8 @@ function commerce_braintree_js_cardonfile_form_submit(&$form, &$form_state) {
   $account = user_load($form_state['card']->uid);
   $cards = commerce_braintree_cardonfile_entities_by_user($form_state['card']->uid);
   commerce_braintree_initialize($form_state['payment_instance']);
-  $nonce = commerce_braintree_js_get_nonce();
+
+  $nonce = !empty($form_state['nonce']) ? $form_state['nonce'] : commerce_braintree_js_get_nonce();
 
   // Populate the customer variable with data from Braintree.
   if (!empty($form_state['values']['customer_id'])) {
