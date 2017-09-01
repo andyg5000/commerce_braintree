@@ -7,7 +7,7 @@
     Drupal.behaviors.commerceBraintreeDropin = {
         attach: function (context, settings) {
             if (typeof settings.commerceBraintreeDropin !== 'undefined') {
-                var $dropInForm = $(context).find('#commerce-braintree-dropin-container').once()
+                var $dropInForm = $(context).find('#commerce-braintree-dropin-container').once();
                 if ($dropInForm.length) {
                     var waitForSdk = setInterval(function () {
                         if (typeof braintree !== 'undefined') {
